@@ -1,0 +1,16 @@
+{% extends 'portal/base.html' %}
+{% block title %}Dashboard{% endblock %}{% block page_heading %}{% if management_mode %}Management Dashboard{% else %}Teacher Dashboard{% endif %}{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-icon indigo"><i class="bi bi-people-fill"></i></div><div><span>Active students</span><strong>{{ cards.students }}</strong></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-icon cyan"><i class="bi bi-diagram-3-fill"></i></div><div><span>Sections</span><strong>{{ cards.sections }}</strong></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-icon green"><i class="bi bi-calendar2-check-fill"></i></div><div><span>Present today</span><strong>{{ cards.present_today }}</strong></div></div></div>
+  {% if management_mode %}<div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-icon orange"><i class="bi bi-person-plus-fill"></i></div><div><span>Pending registrations</span><strong>{{ cards.pending }}</strong></div></div></div>{% else %}<div class="col-sm-6 col-xl-3"><div class="metric-card"><div class="metric-icon orange"><i class="bi bi-journal-bookmark-fill"></i></div><div><span>Subject assignments</span><strong>{{ cards.assignments }}</strong></div></div></div>{% endif %}
+</div>
+{% if management_mode %}<div class="row g-3 mb-4"><div class="col-md-6"><div class="money-card paid"><span>Total fee received</span><strong>₹{{ cards.paid|floatformat:2 }}</strong></div></div><div class="col-md-6"><div class="money-card due"><span>Estimated fee due</span><strong>₹{{ cards.due|floatformat:2 }}</strong></div></div></div>{% endif %}
+<div class="row g-4">
+  <div class="col-lg-7"><div class="panel"><div class="panel-header"><div><h3>Students by class</h3><p>Active student distribution</p></div></div><canvas id="studentsChart" height="120"></canvas></div></div>
+  <div class="col-lg-5"><div class="panel"><div class="panel-header"><div><h3>Recent students</h3><p>Latest records you can access</p></div><a class="btn btn-sm btn-outline-primary" href="{% url 'student_list' %}">View all</a></div><div class="list-group list-group-flush">{% for student in recent_students %}<a href="{% url 'student_detail' student.pk %}" class="list-group-item list-group-item-action d-flex align-items-center gap-3"><div class="avatar">{{ student.first_name|first }}{{ student.last_name|first }}</div><div class="flex-grow-1"><div class="fw-semibold">{{ student.full_name }}</div><small class="text-muted">{{ student.section }} · {{ student.admission_no }}</small></div></a>{% empty %}<div class="empty-state">No students yet.</div>{% endfor %}</div></div></div>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script><script>const chart=document.getElementById('studentsChart');if(chart){new Chart(chart,{type:'bar',data:{labels:{{ chart_labels|safe }},datasets:[{label:'Students',data:{{ chart_values|safe }},borderRadius:8}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}},x:{grid:{display:false}}}}});}</script>{% endblock %}

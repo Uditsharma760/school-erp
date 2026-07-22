@@ -1,0 +1,98 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d4ed8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>{% block title %}School ERP{% endblock %} | {{ school_profile.school_name|default:'School ERP' }}</title>
+  <link rel="manifest" href="{% url 'pwa_manifest' %}">
+  <link rel="icon" href="{% static 'portal/icons/icon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'portal/icons/icon-192.png' %}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'portal/css/app.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% if user.is_authenticated %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><i class="bi bi-mortarboard-fill"></i></div>
+      <div><strong>{{ school_profile.school_name|default:'School ERP' }}</strong><small>{{ active_session.name|default:'Academic Portal' }}</small></div>
+    </div>
+    <nav class="nav flex-column px-2">
+      {% if user.role == 'DIRECTOR' or user.role == 'PRINCIPAL' or user.role == 'ACCOUNTANT' %}
+        <a class="nav-link" href="{% url 'management_dashboard' %}"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+      {% elif user.role == 'TEACHER' %}
+        <a class="nav-link" href="{% url 'teacher_dashboard' %}"><i class="bi bi-grid-1x2-fill"></i> Teacher Dashboard</a>
+      {% elif user.role == 'PARENT' %}
+        <a class="nav-link" href="{% url 'parent_dashboard' %}"><i class="bi bi-house-heart-fill"></i> Parent Dashboard</a>
+      {% elif user.role == 'STUDENT' %}
+        <a class="nav-link" href="{% url 'student_dashboard' %}"><i class="bi bi-person-workspace"></i> Student Dashboard</a>
+      {% elif user.role == 'TRANSPORT' %}
+        <a class="nav-link" href="{% url 'transport_center' %}"><i class="bi bi-bus-front-fill"></i> Transport Dashboard</a>
+      {% endif %}
+
+      <a class="nav-link" href="{% url 'student_list' %}"><i class="bi bi-people-fill"></i> {% if user.role == 'PARENT' %}My Children{% elif user.role == 'STUDENT' %}My Profile{% else %}Students{% endif %}</a>
+
+      {% if user.is_management or user.role == 'TEACHER' %}
+        <a class="nav-link" href="{% url 'class_list' %}"><i class="bi bi-diagram-3-fill"></i> Classes & Sections</a>
+        <a class="nav-link" href="{% url 'marks_hub' %}"><i class="bi bi-journal-check"></i> Marks & Results</a>
+      {% endif %}
+
+      {% if user.is_management or user.role == 'ACCOUNTANT' %}
+        <a class="nav-link" href="{% url 'fee_list' %}"><i class="bi bi-wallet2"></i> Fees</a>
+      {% elif user.role == 'PARENT' or user.role == 'STUDENT' %}
+        <a class="nav-link" href="{% url 'online_fee' %}"><i class="bi bi-credit-card-fill"></i> Pay Fees Online</a>
+      {% endif %}
+
+      {% if user.role != 'TRANSPORT' %}<a class="nav-link" href="{% url 'timetable' %}"><i class="bi bi-calendar3"></i> Timetable</a>{% endif %}
+      <a class="nav-link" href="{% url 'transport_center' %}"><i class="bi bi-bus-front-fill"></i> Transport</a>
+
+      {% if user.is_management or user.role == 'TEACHER' or user.role == 'ACCOUNTANT' or user.role == 'TRANSPORT' %}
+        <a class="nav-link" href="{% url 'payroll_dashboard' %}"><i class="bi bi-cash-stack"></i> Payroll</a>
+      {% endif %}
+
+      {% if user.is_management %}
+        <a class="nav-link" href="{% url 'communications' %}"><i class="bi bi-chat-dots-fill"></i> SMS & WhatsApp</a>
+        <a class="nav-link" href="{% url 'staff_list' %}"><i class="bi bi-person-badge-fill"></i> Staff Accounts</a>
+        <a class="nav-link" href="{% url 'audit_logs' %}"><i class="bi bi-shield-check"></i> Audit Logs</a>
+        <a class="nav-link" href="{% url 'setup_center' %}"><i class="bi bi-sliders"></i> ERP Setup</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="small text-white-50">Signed in as</div>
+      <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+      <span class="badge rounded-pill text-bg-light mt-1">{{ user.get_role_display }}</span>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <button class="btn btn-light d-lg-none me-2" id="sidebarToggle"><i class="bi bi-list"></i></button>
+      <div><h1 class="page-heading">{% block page_heading %}School ERP{% endblock %}</h1><div class="text-muted small">{% now "l, d F Y" %}</div></div>
+      <div class="ms-auto d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm d-none" id="installAppBtn"><i class="bi bi-phone"></i> Install App</button>
+        <a href="{% url 'change_password' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-key"></i> Password</a>
+        <a href="{% url 'logout' %}" class="btn btn-primary btn-sm"><i class="bi bi-box-arrow-right"></i> Logout</a>
+      </div>
+    </header>
+    <div class="content-wrap">
+      {% if user.must_change_password %}<div class="alert alert-warning"><i class="bi bi-shield-exclamation"></i> Please change your temporary password before regular use.</div>{% endif %}
+      {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% else %}
+  {% block public_content %}{% endblock %}
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'portal/js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

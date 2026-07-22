@@ -1,0 +1,3 @@
+{% extends 'portal/base.html' %}{% block title %}Result - {{ student.full_name }}{% endblock %}{% block page_heading %}Result Sheet{% endblock %}
+{% block public_content %}<div class="public-page"><div class="public-header"><div><span class="eyebrow">ONLINE RESULT</span><h1>{{ school_profile.school_name|default:'School ERP' }}</h1><p>{{ exam.name }} · {{ exam.session.name }}</p></div><a class="btn btn-light" href="{% url 'public_results' %}">Search another result</a></div><div class="public-card">{% include 'portal/result_content.html' %}</div></div>{% endblock %}
+{% block content %}{% include 'portal/result_content.html' %}{% endblock %}

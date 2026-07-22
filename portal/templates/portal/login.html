@@ -1,0 +1,38 @@
+{% extends 'portal/base.html' %}
+{% block title %}{{ portal_label }} Login{% endblock %}
+{% block public_content %}
+<div class="auth-page">
+  <section class="auth-visual">
+    <div class="auth-copy">
+      <div class="eyebrow">SECURE SCHOOL MANAGEMENT</div>
+      <h1>{{ school_profile.school_name|default:'School ERP' }}</h1>
+      <p>Attendance, marks, fees, online payments, timetable, transport, payroll and parent communication in one responsive portal.</p>
+      <div class="feature-pills"><span>Role-based access</span><span>Result PDFs</span><span>Virtual ID cards</span><span>Installable web app (PWA)</span></div>
+    </div>
+  </section>
+  <section class="auth-panel">
+    <div class="auth-card">
+      <div class="brand-mark large"><i class="bi bi-mortarboard-fill"></i></div>
+      <div class="eyebrow text-primary">{{ portal_label|upper }} PORTAL</div>
+      <h2 class="mt-2">Welcome back</h2>
+      <p class="text-muted">Use your authorised User ID and password.</p>
+      <form method="post" class="mt-4">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}<div class="mb-3"><label class="form-label">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>{% endfor %}
+        {% if turnstile_site_key %}<div class="cf-turnstile mb-3" data-sitekey="{{ turnstile_site_key }}"></div>{% else %}<div class="mb-3"><label class="form-label">Security check: {{ captcha_question }}</label><input class="form-control" name="captcha_answer" inputmode="numeric" required></div>{% endif %}
+        <button class="btn btn-primary w-100 py-2">Sign in to {{ portal_label }}</button>
+      </form>
+      <div class="auth-links flex-wrap gap-2"><a href="{% url 'public_register' %}">Online admission</a><a href="{% url 'public_results' %}">View result</a></div>
+      <hr class="my-4">
+      <div class="small text-muted mb-2">Open another portal</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-light" href="{% url 'management_login' %}">Management</a>
+        <a class="btn btn-sm btn-light" href="{% url 'teacher_login' %}">Teacher</a>
+        <a class="btn btn-sm btn-light" href="{% url 'parent_login' %}">Parent</a>
+        <a class="btn btn-sm btn-light" href="{% url 'student_login' %}">Student</a>
+      </div>
+    </div>
+  </section>
+</div>
+{% if turnstile_site_key %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
+{% endblock %}
