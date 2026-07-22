@@ -114,26 +114,51 @@ def _home_for(user):
 def login_view(request, portal=None):
     if request.user.is_authenticated:
         return redirect(_home_for(request.user))
+
+    portal_name = portal or "general"
+    captcha_namespace = f"login_{portal_name}"
     form = LoginForm(request=request, data=request.POST or None)
+
     if request.method == "POST":
-        valid_captcha, captcha_error = validate_captcha(request)
+        valid_captcha, captcha_error = validate_captcha(
+            request,
+            captcha_namespace,
+        )
         if not valid_captcha:
             form.add_error(None, captcha_error)
         elif form.is_valid():
             candidate = form.get_user()
             expected_roles = PORTAL_ROLE_MAP.get(portal)
-            if expected_roles and not (candidate.is_superuser or candidate.role in expected_roles):
-                form.add_error(None, f"This User ID cannot access the {portal.title()} portal.")
+
+            if expected_roles and not (
+                candidate.is_superuser or candidate.role in expected_roles
+            ):
+                form.add_error(
+                    None,
+                    f"This User ID cannot access the {portal.title()} portal.",
+                )
             else:
                 auth_login(request, candidate)
-                audit(request, "LOGIN", candidate, f"Signed in through {portal or 'general'} portal")
+                audit(
+                    request,
+                    "LOGIN",
+                    candidate,
+                    f"Signed in through {portal_name} portal",
+                )
                 next_url = request.GET.get("next", "")
                 if next_url and url_has_allowed_host_and_scheme(
-                    next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+                    next_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
                 ):
                     return redirect(next_url)
                 return redirect(_home_for(candidate))
-    captcha_question = "" if settings.TURNSTILE_SITE_KEY else prepare_math_captcha(request)
+
+    captcha_question = (
+        ""
+        if settings.TURNSTILE_SITE_KEY
+        else prepare_math_captcha(request, captcha_namespace)
+    )
     portal_labels = {
         "management": "Principal / Director",
         "teacher": "Teacher",
@@ -148,7 +173,7 @@ def login_view(request, portal=None):
             "captcha_question": captcha_question,
             "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
             "portal_label": portal_labels.get(portal, "School ERP"),
-            "portal": portal or "general",
+            "portal": portal_name,
         },
     )
 
@@ -393,24 +418,60 @@ def student_approve(request, pk):
 
 
 def public_register(request):
-    initial = {"admission_date": timezone.localdate(), "session": AcademicSession.objects.filter(is_active=True).first()}
-    form = PublicStudentRegistrationForm(request.POST or None, request.FILES or None, initial=initial)
+    captcha_namespace = "public_register"
+    initial = {
+        "admission_date": timezone.localdate(),
+        "session": AcademicSession.objects.filter(is_active=True).first(),
+    }
+    form = PublicStudentRegistrationForm(
+        request.POST or None,
+        request.FILES or None,
+        initial=initial,
+    )
+
     if request.method == "POST":
-        valid_captcha, captcha_error = validate_captcha(request)
+        valid_captcha, captcha_error = validate_captcha(
+            request,
+            captcha_namespace,
+        )
         if not valid_captcha:
             form.add_error(None, captcha_error)
         elif form.is_valid():
             student = form.save(commit=False)
-            student.admission_no = f"REG-{timezone.localdate().year}-{uuid4().hex[:6].upper()}"
+            student.admission_no = (
+                f"REG-{timezone.localdate().year}-{uuid4().hex[:6].upper()}"
+            )
             student.status = Student.Status.PENDING
             student.privacy_consent = True
             student.privacy_consent_at = timezone.now()
             student.privacy_consent_ip = request.META.get("REMOTE_ADDR") or None
             student.save()
-            audit(request, "PUBLIC_REGISTRATION", student, "Parent/guardian consent checkbox accepted")
-            return render(request, "portal/registration_success.html", {"student": student})
-    captcha_question = "" if settings.TURNSTILE_SITE_KEY else prepare_math_captcha(request)
-    return render(request, "portal/public_register.html", {"form": form, "captcha_question": captcha_question, "turnstile_site_key": settings.TURNSTILE_SITE_KEY})
+            audit(
+                request,
+                "PUBLIC_REGISTRATION",
+                student,
+                "Parent/guardian consent checkbox accepted",
+            )
+            return render(
+                request,
+                "portal/registration_success.html",
+                {"student": student},
+            )
+
+    captcha_question = (
+        ""
+        if settings.TURNSTILE_SITE_KEY
+        else prepare_math_captcha(request, captcha_namespace)
+    )
+    return render(
+        request,
+        "portal/public_register.html",
+        {
+            "form": form,
+            "captcha_question": captcha_question,
+            "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+        },
+    )
 
 
 @login_required
@@ -546,11 +607,16 @@ def result_pdf(request, student_id, exam_id):
 
 
 def public_results(request):
+    captcha_namespace = "public_results"
     form = ResultSearchForm(request.POST or None)
     student = None
     exams = []
+
     if request.method == "POST":
-        valid_captcha, captcha_error = validate_captcha(request)
+        valid_captcha, captcha_error = validate_captcha(
+            request,
+            captcha_namespace,
+        )
         if not valid_captcha:
             form.add_error(None, captcha_error)
         elif form.is_valid():
@@ -563,9 +629,27 @@ def public_results(request):
                 form.add_error(None, "No matching active student record found.")
             else:
                 request.session["public_result_student"] = student.pk
-                exams = Exam.objects.filter(session=student.session, published=True)
-    captcha_question = "" if settings.TURNSTILE_SITE_KEY else prepare_math_captcha(request)
-    return render(request, "portal/public_results.html", {"form": form, "student": student, "exams": exams, "captcha_question": captcha_question, "turnstile_site_key": settings.TURNSTILE_SITE_KEY})
+                exams = Exam.objects.filter(
+                    session=student.session,
+                    published=True,
+                )
+
+    captcha_question = (
+        ""
+        if settings.TURNSTILE_SITE_KEY
+        else prepare_math_captcha(request, captcha_namespace)
+    )
+    return render(
+        request,
+        "portal/public_results.html",
+        {
+            "form": form,
+            "student": student,
+            "exams": exams,
+            "captcha_question": captcha_question,
+            "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+        },
+    )
 
 
 def public_result_detail(request, exam_id):
