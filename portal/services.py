@@ -101,17 +101,18 @@ def generate_password():
     return secrets.token_urlsafe(10)
 
 
-def prepare_math_captcha(request):
+def prepare_math_captcha(request, namespace="general"):
     a, b = secrets.randbelow(8) + 1, secrets.randbelow(8) + 1
-    request.session["captcha_answer"] = a + b
+    request.session[f"captcha_answer_{namespace}"] = a + b
     return f"{a} + {b} = ?"
 
 
-def validate_captcha(request):
+def validate_captcha(request, namespace="general"):
     if settings.TURNSTILE_SITE_KEY and settings.TURNSTILE_SECRET_KEY:
         token = request.POST.get("cf-turnstile-response", "")
         if not token:
             return False, "Please complete the CAPTCHA."
+
         try:
             response = requests.post(
                 "https://challenges.cloudflare.com/turnstile/v0/siteverify",
@@ -122,21 +123,41 @@ def validate_captcha(request):
                 },
                 timeout=8,
             )
+
             data = response.json() if response.content else {}
+
             if response.ok and data.get("success"):
-                allowed_hostname = getattr(settings, "TURNSTILE_EXPECTED_HOSTNAME", "")
-                if not allowed_hostname or data.get("hostname") == allowed_hostname:
+                allowed_hostname = getattr(
+                    settings,
+                    "TURNSTILE_EXPECTED_HOSTNAME",
+                    "",
+                )
+
+                if (
+                    not allowed_hostname
+                    or data.get("hostname") == allowed_hostname
+                ):
                     return True, ""
+
         except (requests.RequestException, ValueError):
             pass
+
         return False, "CAPTCHA verification failed. Please try again."
 
-    expected = request.session.pop("captcha_answer", None)
+    expected = request.session.pop(
+        f"captcha_answer_{namespace}",
+        None,
+    )
+
     try:
         supplied = int(request.POST.get("captcha_answer", ""))
     except (TypeError, ValueError):
         supplied = None
-    return supplied == expected, "" if supplied == expected else "Incorrect CAPTCHA answer."
+
+    return (
+        supplied == expected,
+        "" if supplied == expected else "Incorrect CAPTCHA answer.",
+    )
 
 
 def audit(request, action, obj=None, description=""):
