@@ -102,8 +102,53 @@ def generate_password():
 
 
 def prepare_math_captcha(request, namespace="general"):
-    a, b = secrets.randbelow(8) + 1, secrets.randbelow(8) + 1
-    request.session[f"captcha_answer_{namespace}"] = a + b
+    """
+    Create a maths CAPTCHA without invalidating CAPTCHAs already open in
+    another tab of the same portal.
+
+    Up to five recent answers are retained for ten minutes per namespace.
+    """
+    a = secrets.randbelow(8) + 1
+    b = secrets.randbelow(8) + 1
+
+    session_key = f"captcha_answers_{namespace}"
+    now_ts = int(timezone.now().timestamp())
+    max_age_seconds = 10 * 60
+
+    stored = request.session.get(session_key, [])
+    valid_entries = []
+
+    for entry in stored:
+        if not isinstance(entry, dict):
+            continue
+
+        created_at = entry.get("created_at")
+        answer = entry.get("answer")
+
+        try:
+            created_at = int(created_at)
+            answer = int(answer)
+        except (TypeError, ValueError):
+            continue
+
+        if now_ts - created_at <= max_age_seconds:
+            valid_entries.append(
+                {
+                    "answer": answer,
+                    "created_at": created_at,
+                }
+            )
+
+    valid_entries.append(
+        {
+            "answer": a + b,
+            "created_at": now_ts,
+        }
+    )
+
+    request.session[session_key] = valid_entries[-5:]
+    request.session.modified = True
+
     return f"{a} + {b} = ?"
 
 
@@ -144,21 +189,42 @@ def validate_captcha(request, namespace="general"):
 
         return False, "CAPTCHA verification failed. Please try again."
 
-    expected = request.session.pop(
-        f"captcha_answer_{namespace}",
-        None,
-    )
-
     try:
         supplied = int(request.POST.get("captcha_answer", ""))
     except (TypeError, ValueError):
         supplied = None
 
-    return (
-        supplied == expected,
-        "" if supplied == expected else "Incorrect CAPTCHA answer.",
-    )
+    session_key = f"captcha_answers_{namespace}"
+    now_ts = int(timezone.now().timestamp())
+    max_age_seconds = 10 * 60
 
+    stored = request.session.pop(session_key, [])
+    request.session.modified = True
+
+    valid_answers = []
+
+    for entry in stored:
+        if not isinstance(entry, dict):
+            continue
+
+        created_at = entry.get("created_at")
+        answer = entry.get("answer")
+
+        try:
+            created_at = int(created_at)
+            answer = int(answer)
+        except (TypeError, ValueError):
+            continue
+
+        if now_ts - created_at <= max_age_seconds:
+            valid_answers.append(answer)
+
+    is_valid = supplied is not None and supplied in valid_answers
+
+    return (
+        is_valid,
+        "" if is_valid else "Incorrect CAPTCHA answer. Please use the current question and try again.",
+    )
 
 def audit(request, action, obj=None, description=""):
     try:
