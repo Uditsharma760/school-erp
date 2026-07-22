@@ -117,54 +117,72 @@ def login_view(request, portal=None):
 
     portal_name = portal or "general"
     captcha_namespace = f"login_{portal_name}"
-    form = LoginForm(request=request, data=request.POST or None)
+
+    form = LoginForm(
+        request=request,
+        data=request.POST or None,
+    )
 
     if request.method == "POST":
         valid_captcha, captcha_error = validate_captcha(
             request,
             captcha_namespace,
         )
+
         if not valid_captcha:
             form.add_error(None, captcha_error)
+
         elif form.is_valid():
             candidate = form.get_user()
             expected_roles = PORTAL_ROLE_MAP.get(portal)
 
             if expected_roles and not (
-                candidate.is_superuser or candidate.role in expected_roles
+                candidate.is_superuser
+                or candidate.role in expected_roles
             ):
                 form.add_error(
                     None,
-                    f"This User ID cannot access the {portal.title()} portal.",
+                    f"This User ID cannot access the "
+                    f"{portal.title()} portal.",
                 )
+
             else:
                 auth_login(request, candidate)
+
                 audit(
                     request,
                     "LOGIN",
                     candidate,
                     f"Signed in through {portal_name} portal",
                 )
+
                 next_url = request.GET.get("next", "")
+
                 if next_url and url_has_allowed_host_and_scheme(
                     next_url,
                     allowed_hosts={request.get_host()},
                     require_https=request.is_secure(),
                 ):
                     return redirect(next_url)
+
                 return redirect(_home_for(candidate))
 
     captcha_question = (
         ""
         if settings.TURNSTILE_SITE_KEY
-        else prepare_math_captcha(request, captcha_namespace)
+        else prepare_math_captcha(
+            request,
+            captcha_namespace,
+        )
     )
+
     portal_labels = {
         "management": "Principal / Director",
         "teacher": "Teacher",
         "parent": "Parent / Guardian",
         "student": "Student",
     }
+
     return render(
         request,
         "portal/login.html",
@@ -172,7 +190,10 @@ def login_view(request, portal=None):
             "form": form,
             "captcha_question": captcha_question,
             "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
-            "portal_label": portal_labels.get(portal, "School ERP"),
+            "portal_label": portal_labels.get(
+                portal,
+                "School ERP",
+            ),
             "portal": portal_name,
         },
     )
