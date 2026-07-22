@@ -3,7 +3,7 @@ services:
     name: school-erp-pro
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput
+    buildCommand: |pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput   
     startCommand: python manage.py migrate && python manage.py create_initial_admin && gunicorn schoolerp.wsgi:application --workers 2 --timeout 120
     healthCheckPath: /login/
     envVars:
