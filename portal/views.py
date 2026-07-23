@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 
 from .decorators import roles_required
 from .forms import (
+    StaffPasswordResetForm,
     AcademicSessionForm,
     CommunicationForm,
     CustomPasswordChangeForm,
@@ -861,13 +862,150 @@ def staff_toggle(request, pk):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 def staff_reset_password(request, pk):
-    staff = get_object_or_404(User, pk=pk, is_superuser=False)
-    password = generate_password()
-    staff.set_password(password)
-    staff.must_change_password = True
-    staff.save(update_fields=["password", "must_change_password"])
-    audit(request, "STAFF_PASSWORD_RESET", staff)
-    return render(request, "portal/credentials.html", {"credentials": {"username": staff.username, "password": password, "name": staff.get_full_name()}})
+    staff = get_object_or_404(
+        User,
+        pk=pk,
+        is_superuser=False,
+        role__in=[
+            User.Role.DIRECTOR,
+            User.Role.PRINCIPAL,
+            User.Role.TEACHER,
+            User.Role.ACCOUNTANT,
+            User.Role.TRANSPORT,
+        ],
+    )
+
+    # A Principal must not take control of a Director account.
+    if (
+        request.user.role == User.Role.PRINCIPAL
+        and staff.role == User.Role.DIRECTOR
+    ):
+        messages.error(
+            request,
+            "A Principal cannot reset a Director account password.",
+        )
+        return redirect("staff_list")
+
+    form = StaffPasswordResetForm(
+        staff,
+        request.POST or None,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        updated_staff = form.save(commit=True)
+
+        # Management has already chosen the final password.
+        updated_staff.must_change_password = False
+        updated_staff.save(update_fields=["must_change_password"])
+
+        audit(
+            request,
+            "STAFF_PASSWORD_RESET",
+            updated_staff,
+            f"Password manually reset for {updated_staff.username}",
+        )
+
+        messages.success(
+            request,
+            f"New password saved successfully for "
+            f"{updated_staff.username}.",
+        )
+        return redirect("staff_list")
+
+    return render(
+        request,
+        "portal/staff_password_reset.html",
+        {
+            "form": form,
+            "staff_member": staff,
+        },
+    )
+
+@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
+def staff_delete(request, pk):
+    staff = get_object_or_404(
+        User,
+        pk=pk,
+        is_superuser=False,
+        role__in=[
+            User.Role.DIRECTOR,
+            User.Role.PRINCIPAL,
+            User.Role.TEACHER,
+            User.Role.ACCOUNTANT,
+            User.Role.TRANSPORT,
+        ],
+    )
+
+    if staff.pk == request.user.pk:
+        messages.error(request, "You cannot delete your own account.")
+        return redirect("staff_list")
+
+    if staff.is_active:
+        messages.error(
+            request,
+            "Deactivate this account before deleting it.",
+        )
+        return redirect("staff_list")
+
+    # A Principal must not delete a Director account.
+    if (
+        request.user.role == User.Role.PRINCIPAL
+        and staff.role == User.Role.DIRECTOR
+    ):
+        messages.error(
+            request,
+            "A Principal cannot delete a Director account.",
+        )
+        return redirect("staff_list")
+
+    if request.method == "POST":
+        confirmation = request.POST.get(
+            "confirmation",
+            "",
+        ).strip().upper()
+
+        if confirmation != "DELETE":
+            messages.error(
+                request,
+                "Type DELETE exactly to confirm account deletion.",
+            )
+        else:
+            username = staff.username
+            full_name = staff.get_full_name() or username
+            role_name = staff.get_role_display()
+
+            try:
+                with transaction.atomic():
+                    staff.delete()
+            except ProtectedError:
+                messages.error(
+                    request,
+                    "This account is linked to protected school records "
+                    "and cannot be deleted. Keep it inactive instead.",
+                )
+            else:
+                audit(
+                    request,
+                    "STAFF_DELETED",
+                    description=(
+                        f"Deleted inactive staff account: "
+                        f"{username} ({role_name})"
+                    ),
+                )
+                messages.success(
+                    request,
+                    f"Inactive account {full_name} ({username}) "
+                    f"was deleted.",
+                )
+                return redirect("staff_list")
+
+    return render(
+        request,
+        "portal/staff_confirm_delete.html",
+        {
+            "staff_member": staff,
+        },
+    )
 
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
