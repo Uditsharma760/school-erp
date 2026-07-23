@@ -1,5 +1,3 @@
-{% extends 'portal/base.html' %}{% block title %}Staff Accounts{% endblock %}{% block page_heading %}Staff Accounts{% endblock %}
-{% block content %}<div class="panel"><div class="panel-header"><div><h3>Teacher and management login accounts</h3><p>Passwords are hashed; reset when a user forgets the temporary password.</p></div><a class="btn btn-primary" href="{% url 'staff_create' %}"><i class="bi bi-person-plus"></i> Generate account</a></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Name</th><th>User ID</th><th>Role</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for person in staff %}<tr><td><strong>{{ person.get_full_name|default:'Unnamed staff' }}</strong><small class="d-block text-muted">{{ person.email|default:'—' }}</small></td><td><code>{{ person.username }}</code></td><td>{{ person.get_role_display }}</td><td>{{ person.phone|default:'—' }}</td><td>{% if person.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}</td><td><a class="btn btn-sm btn-outline-primary" href="{% url 'staff_reset_password' person.pk %}">Reset password</a> <form class="d-inline" method="post" action="{% url 'staff_toggle' person.pk %}">{% csrf_token %}<button class="btn btn-sm btn-light">{% if person.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td></tr>{% empty %}<tr><td colspan="6">No staff accounts.</td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}
 {% extends 'portal/base.html' %}
 
 {% block title %}Staff Accounts{% endblock %}
@@ -10,15 +8,14 @@
 
   <div class="panel-header">
     <div>
-      <h3>Staff accounts</h3>
+      <h3>Staff Accounts</h3>
       <p>
-        Create accounts, activate/deactivate users,
+        Create accounts, activate or deactivate users,
         set passwords and remove inactive accounts.
       </p>
     </div>
 
-    <a href="{% url 'staff_create' %}"
-       class="btn btn-primary">
+    <a href="{% url 'staff_create' %}" class="btn btn-primary">
       <i class="bi bi-person-plus-fill"></i>
       Add Staff
     </a>
@@ -43,6 +40,7 @@
               <strong>
                 {{ person.get_full_name|default:person.username }}
               </strong>
+
               <small class="d-block text-muted">
                 {{ person.email|default:'No email' }}
                 {% if person.phone %}
@@ -70,7 +68,7 @@
             <td class="text-end">
               <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
 
-                {% if not request.user.role == 'PRINCIPAL' or person.role != 'DIRECTOR' %}
+                {% if request.user.role != 'PRINCIPAL' or person.role != 'DIRECTOR' %}
                   <a
                     href="{% url 'staff_reset_password' person.pk %}"
                     class="btn btn-sm btn-outline-primary">
@@ -105,7 +103,7 @@
                 {% endif %}
 
                 {% if not person.is_active and person.pk != request.user.pk %}
-                  {% if not request.user.role == 'PRINCIPAL' or person.role != 'DIRECTOR' %}
+                  {% if request.user.role != 'PRINCIPAL' or person.role != 'DIRECTOR' %}
                     <a
                       href="{% url 'staff_delete' person.pk %}"
                       class="btn btn-sm btn-outline-danger">
@@ -118,6 +116,7 @@
               </div>
             </td>
           </tr>
+
         {% empty %}
           <tr>
             <td colspan="5" class="empty-state">
