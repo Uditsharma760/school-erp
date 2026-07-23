@@ -1,0 +1,43 @@
+{% extends 'portal/base.html' %}
+{% block title %}Delete Fee Payment{% endblock %}
+{% block page_heading %}Delete Fee Payment{% endblock %}
+
+{% block content %}
+<div class="panel mx-auto" style="max-width: 720px;">
+  <div class="alert alert-danger">
+    <strong>Warning:</strong> deleting a fee receipt changes the student's paid and due balance.
+  </div>
+
+  <h3>Delete receipt {{ payment.receipt_no }}?</h3>
+  <div class="table-responsive my-4">
+    <table class="table">
+      <tbody>
+        <tr><th>Student</th><td>{{ payment.student.full_name }}</td></tr>
+        <tr><th>Admission No.</th><td>{{ payment.student.admission_no }}</td></tr>
+        <tr><th>Amount</th><td>₹{{ payment.amount }}</td></tr>
+        <tr><th>Date</th><td>{{ payment.payment_date|date:'d-m-Y' }}</td></tr>
+        <tr><th>Mode</th><td>{{ payment.get_mode_display }}</td></tr>
+        <tr><th>Reference</th><td>{{ payment.reference_no|default:'—' }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <label class="form-label" for="confirmation">
+      Type <strong>DELETE</strong> to confirm
+    </label>
+    <input
+      class="form-control"
+      id="confirmation"
+      name="confirmation"
+      autocomplete="off"
+      required>
+
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-danger" type="submit">Delete payment</button>
+      <a class="btn btn-light" href="{% url 'fee_list' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
