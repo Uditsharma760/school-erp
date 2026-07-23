@@ -1,5 +1,9 @@
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    PasswordChangeForm,
+    SetPasswordForm,
+)
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 
@@ -202,6 +206,30 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
 class CustomPasswordChangeForm(StyledFormMixin, PasswordChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.apply_styles()
+
+class StaffPasswordResetForm(StyledFormMixin, SetPasswordForm):
+    """Allows Director/Principal to set a chosen password for a staff user."""
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+
+        self.fields["new_password1"].label = "Create New Password"
+        self.fields["new_password2"].label = "Confirm New Password"
+
+        self.fields["new_password1"].widget.attrs.update(
+            {
+                "placeholder": "Enter new password",
+                "autocomplete": "new-password",
+            }
+        )
+        self.fields["new_password2"].widget.attrs.update(
+            {
+                "placeholder": "Enter the same password again",
+                "autocomplete": "new-password",
+            }
+        )
+
         self.apply_styles()
 
 
