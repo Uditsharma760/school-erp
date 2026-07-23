@@ -1,0 +1,44 @@
+{% extends 'portal/base.html' %}
+{% block title %}Delete {{ item_label }}{% endblock %}
+{% block page_heading %}Delete {{ item_label }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="panel border border-danger-subtle">
+      <div class="alert alert-danger">
+        <strong>Warning:</strong> You are deleting <strong>{{ object }}</strong>.
+        Related records may prevent deletion or may also be removed, depending on
+        how they are linked.
+      </div>
+
+      <p class="text-muted">
+        Before deleting a class, section, subject, session or exam, move or remove
+        its linked students, timetable entries, marks, fee structures and assignments.
+      </p>
+
+      <form method="post">
+        {% csrf_token %}
+        <label class="form-label" for="confirmation">
+          Type <strong>DELETE</strong> to confirm
+        </label>
+        <input
+          class="form-control"
+          id="confirmation"
+          name="confirmation"
+          autocomplete="off"
+          required>
+
+        <div class="d-flex gap-2 mt-4">
+          <button class="btn btn-danger" type="submit">
+            Permanently delete
+          </button>
+          <a class="btn btn-outline-secondary" href="{{ cancel_url }}">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
