@@ -76,191 +76,142 @@
 
     </div>
 
-    <nav class="nav flex-column px-2 sidebar-nav">
+   <nav class="nav flex-column px-2 sidebar-nav">
 
-      {% if user.role == 'DIRECTOR' or user.role == 'PRINCIPAL' or user.role == 'ACCOUNTANT' %}
+  {% if user.role == 'DIRECTOR' or user.role == 'PRINCIPAL' or user.role == 'ACCOUNTANT' %}
+    <a class="nav-link" href="{% url 'management_dashboard' %}">
+      <i class="bi bi-grid-1x2-fill"></i>
+      <span>Dashboard</span>
+    </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'management_dashboard' %}">
-          <i class="bi bi-grid-1x2-fill"></i>
-          Dashboard
-        </a>
+  {% elif user.role == 'TEACHER' %}
+    <a class="nav-link" href="{% url 'teacher_dashboard' %}">
+      <i class="bi bi-grid-1x2-fill"></i>
+      <span>Teacher Dashboard</span>
+    </a>
 
-      {% elif user.role == 'TEACHER' %}
+  {% elif user.role == 'PARENT' %}
+    <a class="nav-link" href="{% url 'parent_dashboard' %}">
+      <i class="bi bi-house-heart-fill"></i>
+      <span>Parent Dashboard</span>
+    </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'teacher_dashboard' %}">
-          <i class="bi bi-grid-1x2-fill"></i>
-          Teacher Dashboard
-        </a>
+  {% elif user.role == 'STUDENT' %}
+    <a class="nav-link" href="{% url 'student_dashboard' %}">
+      <i class="bi bi-person-workspace"></i>
+      <span>Student Dashboard</span>
+    </a>
 
-      {% elif user.role == 'PARENT' %}
+  {% elif user.role == 'TRANSPORT' %}
+    <a class="nav-link" href="{% url 'transport_center' %}">
+      <i class="bi bi-bus-front-fill"></i>
+      <span>Transport Dashboard</span>
+    </a>
+  {% endif %}
 
-        <a
-          class="nav-link"
-          href="{% url 'parent_dashboard' %}">
-          <i class="bi bi-house-heart-fill"></i>
-          Parent Dashboard
-        </a>
 
+  <a class="nav-link" href="{% url 'student_list' %}">
+    <i class="bi bi-people-fill"></i>
+
+    <span>
+      {% if user.role == 'PARENT' %}
+        My Children
       {% elif user.role == 'STUDENT' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'student_dashboard' %}">
-          <i class="bi bi-person-workspace"></i>
-          Student Dashboard
-        </a>
-
-      {% elif user.role == 'TRANSPORT' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'transport_center' %}">
-          <i class="bi bi-bus-front-fill"></i>
-          Transport Dashboard
-        </a>
-
+        My Profile
+      {% else %}
+        Students
       {% endif %}
+    </span>
+  </a>
 
 
-      <a
-        class="nav-link"
-        href="{% url 'student_list' %}">
-
-        <i class="bi bi-people-fill"></i>
-
-        {% if user.role == 'PARENT' %}
-          My Children
-        {% elif user.role == 'STUDENT' %}
-          My Profile
-        {% else %}
-          Students
-        {% endif %}
-
-      </a>
+  {% if user.is_management or user.role == 'TEACHER' %}
+    <a class="nav-link" href="{% url 'class_list' %}">
+      <i class="bi bi-diagram-3-fill"></i>
+      <span>Classes & Sections</span>
+    </a>
+  {% endif %}
 
 
-      {% if user.is_management or user.role == 'TEACHER' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'class_list' %}">
-          <i class="bi bi-diagram-3-fill"></i>
-          Classes & Sections
-        </a>
-
-        <!-- Director/Principal ke liye direct setup link -->
-        {% if user.is_management %}
-
-          <a
-            class="nav-link"
-            href="{% url 'setup_center' %}">
-            <i class="bi bi-plus-square-fill"></i>
-            Add Class / Section / Subject
-          </a>
-
-        {% endif %}
-
-        <a
-          class="nav-link"
-          href="{% url 'marks_hub' %}">
-          <i class="bi bi-journal-check"></i>
-          Marks & Results
-        </a>
-
-      {% endif %}
+  {% if user.is_management %}
+    <a class="nav-link" href="{% url 'setup_center' %}">
+      <i class="bi bi-plus-square-fill"></i>
+      <span>Add Class / Section / Subject</span>
+    </a>
+  {% endif %}
 
 
-      {% if user.is_management or user.role == 'ACCOUNTANT' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'fee_list' %}">
-          <i class="bi bi-wallet2"></i>
-          Fees
-        </a>
-
-      {% elif user.role == 'PARENT' or user.role == 'STUDENT' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'online_fee' %}">
-          <i class="bi bi-credit-card-fill"></i>
-          Pay Fees Online
-        </a>
-
-      {% endif %}
+  {% if user.is_management or user.role == 'TEACHER' %}
+    <a class="nav-link" href="{% url 'marks_hub' %}">
+      <i class="bi bi-journal-check"></i>
+      <span>Marks & Results</span>
+    </a>
+  {% endif %}
 
 
-      {% if user.role != 'TRANSPORT' %}
+  {% if user.is_management or user.role == 'ACCOUNTANT' %}
+    <a class="nav-link" href="{% url 'fee_list' %}">
+      <i class="bi bi-wallet2"></i>
+      <span>Fees</span>
+    </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'timetable' %}">
-          <i class="bi bi-calendar3"></i>
-          Timetable
-        </a>
-
-      {% endif %}
-
-
-      <a
-        class="nav-link"
-        href="{% url 'transport_center' %}">
-        <i class="bi bi-bus-front-fill"></i>
-        Transport
-      </a>
+  {% elif user.role == 'PARENT' or user.role == 'STUDENT' %}
+    <a class="nav-link" href="{% url 'online_fee' %}">
+      <i class="bi bi-credit-card-fill"></i>
+      <span>Pay Fees Online</span>
+    </a>
+  {% endif %}
 
 
-      {% if user.is_management or user.role == 'TEACHER' or user.role == 'ACCOUNTANT' or user.role == 'TRANSPORT' %}
-
-        <a
-          class="nav-link"
-          href="{% url 'payroll_dashboard' %}">
-          <i class="bi bi-cash-stack"></i>
-          Payroll
-        </a>
-
-      {% endif %}
+  {% if user.role != 'TRANSPORT' %}
+    <a class="nav-link" href="{% url 'timetable' %}">
+      <i class="bi bi-calendar3"></i>
+      <span>Timetable</span>
+    </a>
+  {% endif %}
 
 
-      {% if user.is_management %}
+  <a class="nav-link" href="{% url 'transport_center' %}">
+    <i class="bi bi-bus-front-fill"></i>
+    <span>Transport</span>
+  </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'communications' %}">
-          <i class="bi bi-chat-dots-fill"></i>
-          SMS & WhatsApp
-        </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'staff_list' %}">
-          <i class="bi bi-person-badge-fill"></i>
-          Staff Accounts
-        </a>
+  {% if user.is_management or user.role == 'TEACHER' or user.role == 'ACCOUNTANT' or user.role == 'TRANSPORT' %}
+    <a class="nav-link" href="{% url 'payroll_dashboard' %}">
+      <i class="bi bi-cash-stack"></i>
+      <span>Payroll</span>
+    </a>
+  {% endif %}
 
-        <a
-          class="nav-link"
-          href="{% url 'audit_logs' %}">
-          <i class="bi bi-shield-check"></i>
-          Audit Logs
-        </a>
 
-        <a
-          class="nav-link"
-          href="{% url 'setup_center' %}">
-          <i class="bi bi-sliders"></i>
-          Complete ERP Setup
-        </a>
+  {% if user.is_management %}
+    <div class="sidebar-section-title">
+      Management
+    </div>
 
-      {% endif %}
+    <a class="nav-link" href="{% url 'communications' %}">
+      <i class="bi bi-chat-dots-fill"></i>
+      <span>SMS & WhatsApp</span>
+    </a>
 
-    </nav>
+    <a class="nav-link" href="{% url 'staff_list' %}">
+      <i class="bi bi-person-badge-fill"></i>
+      <span>Staff Accounts</span>
+    </a>
 
+    <a class="nav-link" href="{% url 'audit_logs' %}">
+      <i class="bi bi-shield-check"></i>
+      <span>Audit Logs</span>
+    </a>
+
+    <a class="nav-link" href="{% url 'setup_center' %}">
+      <i class="bi bi-sliders"></i>
+      <span>Complete ERP Setup</span>
+    </a>
+  {% endif %}
+
+</nav>
 
     <div class="sidebar-footer">
 
