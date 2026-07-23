@@ -56,7 +56,16 @@
 
 <div class="app-shell">
 
-  <aside class="sidebar" id="sidebar">
+  <aside
+  class="sidebar"
+  id="sidebar"
+  style="
+    height:100vh;
+    max-height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  ">
 
     <div class="brand">
 
@@ -76,7 +85,17 @@
 
     </div>
 
-   <nav class="nav flex-column px-2 sidebar-nav">
+   <nav
+  class="nav flex-column px-2 sidebar-nav"
+  style="
+    flex:1 1 0;
+    min-height:0;
+    height:0;
+    overflow-y:scroll;
+    overflow-x:hidden;
+    padding-top:10px;
+    padding-bottom:30px;
+  ">
 
   {% if user.role == 'DIRECTOR' or user.role == 'PRINCIPAL' or user.role == 'ACCOUNTANT' %}
     <a class="nav-link" href="{% url 'management_dashboard' %}">
@@ -213,7 +232,13 @@
 
 </nav>
 
-    <div class="sidebar-footer">
+    <div
+  class="sidebar-footer"
+  style="
+    flex:0 0 auto;
+    position:relative;
+    margin-top:0;
+  ">
 
       <div class="small text-white-50">
         Signed in as
