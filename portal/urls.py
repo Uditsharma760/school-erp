@@ -3,7 +3,6 @@ from django.urls import path, reverse_lazy
 
 from . import views
 
-x`x
 urlpatterns = [
     path(
         "password/forgot/",
