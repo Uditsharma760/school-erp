@@ -372,8 +372,29 @@ class TeacherAssignmentForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.fields["teacher"].queryset = User.objects.filter(
+            role=User.Role.TEACHER,
+            is_active=True,
+        ).order_by(
+            "first_name",
+            "last_name",
+            "username",
+        )
+
+        def teacher_name(teacher):
+            full_name = (
+                f"{teacher.first_name} {teacher.last_name}"
+            ).strip()
+
+            if full_name:
+                return full_name
+
+            return "Teacher name not added"
+
+        self.fields["teacher"].label_from_instance = teacher_name
+
         self.apply_styles()
-        self.fields["teacher"].queryset = User.objects.filter(role=User.Role.TEACHER, is_active=True)
 
 
 class TimetableEntryForm(StyledFormMixin, forms.ModelForm):
