@@ -845,16 +845,34 @@ def staff_reset_password(request, pk):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
 def fee_list(request):
-    students = Student.objects.filter(status=Student.Status.ACTIVE).select_related("section__school_class", "session")
+    students = Student.objects.filter(
+        status=Student.Status.ACTIVE,
+    ).select_related("section__school_class", "session")
+    payments = FeePayment.objects.select_related("student", "received_by")
+
     q = request.GET.get("q", "").strip()
     if q:
-        students = students.filter(Q(admission_no__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(guardian_phone__icontains=q))
+        student_filter = (
+            Q(admission_no__icontains=q)
+            | Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+            | Q(guardian_phone__icontains=q)
+        )
+        students = students.filter(student_filter)
+        payments = payments.filter(
+            Q(student__admission_no__icontains=q)
+            | Q(student__first_name__icontains=q)
+            | Q(student__last_name__icontains=q)
+            | Q(receipt_no__icontains=q)
+            | Q(reference_no__icontains=q)
+        )
+
     return render(
         request,
         "portal/fee_list.html",
         {
             "students": students[:500],
-            "recent_payments": FeePayment.objects.select_related("student")[:10],
+            "recent_payments": payments[:200],
             "online_orders": PaymentOrder.objects.select_related("student")[:10],
             "payment_enabled": payment_gateway_configured(),
         },
@@ -863,7 +881,11 @@ def fee_list(request):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
 def fee_payment_create(request, student_id=None):
-    initial = {"student": student_id, "payment_date": timezone.localdate(), "receipt_no": f"RCPT-{timezone.now().strftime('%Y%m%d%H%M%S')}"}
+    initial = {
+        "student": student_id,
+        "payment_date": timezone.localdate(),
+        "receipt_no": f"RCPT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+    }
     form = FeePaymentForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         payment = form.save(commit=False)
@@ -872,7 +894,91 @@ def fee_payment_create(request, student_id=None):
         audit(request, "FEE_RECORDED", payment)
         messages.success(request, "Fee payment recorded.")
         return redirect("student_detail", pk=payment.student_id)
-    return render(request, "portal/form_page.html", {"form": form, "title": "Record fee payment", "submit_label": "Save payment"})
+    return render(
+        request,
+        "portal/form_page.html",
+        {
+            "form": form,
+            "title": "Record fee payment",
+            "submit_label": "Save payment",
+        },
+    )
+
+
+@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
+def fee_payment_edit(request, pk):
+    payment = get_object_or_404(
+        FeePayment.objects.select_related("student", "received_by"),
+        pk=pk,
+    )
+
+    # Gateway-created receipts must stay consistent with Razorpay records.
+    if payment.mode == FeePayment.Mode.ONLINE or payment.gateway_payment_id:
+        messages.error(
+            request,
+            "Online gateway payments are locked. Use Razorpay refund/reconciliation instead of editing the receipt.",
+        )
+        return redirect("fee_list")
+
+    form = FeePaymentForm(request.POST or None, instance=payment)
+    if request.method == "POST" and form.is_valid():
+        updated_payment = form.save()
+        audit(request, "FEE_PAYMENT_UPDATED", updated_payment)
+        messages.success(request, "Fee payment updated successfully.")
+        return redirect("fee_list")
+
+    return render(
+        request,
+        "portal/form_page.html",
+        {
+            "form": form,
+            "title": f"Edit fee payment — {payment.receipt_no}",
+            "submit_label": "Update payment",
+        },
+    )
+
+
+@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
+def fee_payment_delete(request, pk):
+    payment = get_object_or_404(
+        FeePayment.objects.select_related("student", "received_by"),
+        pk=pk,
+    )
+
+    # Never silently remove a gateway payment from the ERP ledger.
+    if payment.mode == FeePayment.Mode.ONLINE or payment.gateway_payment_id:
+        messages.error(
+            request,
+            "Online gateway payments cannot be deleted here. Reconcile or refund them through Razorpay.",
+        )
+        return redirect("fee_list")
+
+    if request.method == "POST":
+        if request.POST.get("confirmation", "").strip().upper() != "DELETE":
+            messages.error(
+                request,
+                'Type DELETE in the confirmation box to continue.',
+            )
+        else:
+            receipt_no = payment.receipt_no
+            payment_text = str(payment)
+            payment.delete()
+            audit(
+                request,
+                "FEE_PAYMENT_DELETED",
+                description=f"Deleted fee payment: {payment_text}",
+            )
+            messages.success(
+                request,
+                f"Fee payment {receipt_no} deleted successfully.",
+            )
+            return redirect("fee_list")
+
+    return render(
+        request,
+        "portal/fee_payment_confirm_delete.html",
+        {"payment": payment},
+    )
 
 
 @login_required
