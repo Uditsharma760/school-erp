@@ -1,6 +1,364 @@
-{% extends 'portal/base.html' %}{% block title %}ERP Setup{% endblock %}{% block page_heading %}ERP Setup Center{% endblock %}
-{% block content %}<ul class="nav nav-pills setup-tabs mb-4" role="tablist"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#profile">School</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#academic">Academic</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#exams">Exams & Fees</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#assignments">Assignments</button></li></ul><div class="tab-content">
-<div class="tab-pane fade show active" id="profile"><div class="panel"><h3>School profile</h3><form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="profile"><div class="row g-3">{% for field in forms.profile %}<div class="col-md-6"><label class="form-label">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div><button class="btn btn-primary mt-3">Save profile</button></form></div></div>
-<div class="tab-pane fade" id="academic"><div class="row g-4"><div class="col-lg-6"><div class="panel mb-4"><h3>Add academic session</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="session">{{ forms.session.as_p }}<button class="btn btn-primary">Add session</button></form></div><div class="panel"><h3>Add class</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="class">{{ forms.class.as_p }}<button class="btn btn-primary">Add class</button></form><hr><div class="chip-list">{% for c in classes %}<span>{{ c.name }}</span>{% endfor %}</div></div></div><div class="col-lg-6"><div class="panel mb-4"><h3>Add section</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="section">{{ forms.section.as_p }}<button class="btn btn-primary">Add section</button></form><hr>{% for s in sections %}<div class="setup-row"><span>{{ s }}</span><small>{{ s.class_teacher.get_full_name|default:'No class teacher' }}</small></div>{% endfor %}</div><div class="panel"><h3>Add subject</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="subject">{{ forms.subject.as_p }}<button class="btn btn-primary">Add subject</button></form><hr><div class="chip-list">{% for s in subjects %}<span>{{ s.name }} · {{ s.code }}</span>{% endfor %}</div></div></div></div></div>
-<div class="tab-pane fade" id="exams"><div class="row g-4"><div class="col-lg-6"><div class="panel"><h3>Create exam</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="exam">{{ forms.exam.as_p }}<button class="btn btn-primary">Create exam</button></form><hr>{% for e in exams %}<div class="setup-row"><span>{{ e.name }} · {{ e.session }}</span><small>{% if e.published %}Published{% else %}Draft{% endif %}</small></div>{% endfor %}</div></div><div class="col-lg-6"><div class="panel"><h3>Add fee structure</h3><form method="post">{% csrf_token %}<input type="hidden" name="action" value="fee">{{ forms.fee.as_p }}<button class="btn btn-primary">Add fee head</button></form><hr>{% for f in fees %}<div class="setup-row"><span>{{ f.school_class }} · {{ f.name }}</span><small>₹{{ f.amount }} · {{ f.session }}</small></div>{% endfor %}</div></div></div></div>
-<div class="tab-pane fade" id="assignments"><div class="row g-4"><div class="col-lg-5"><div class="panel"><h3>Assign teacher</h3><p class="text-muted">This permission controls who can enter marks for a subject and section.</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="assignment">{{ forms.assignment.as_p }}<button class="btn btn-primary">Create assignment</button></form></div></div><div class="col-lg-7"><div class="panel"><h3>Current assignments</h3>{% for a in assignments %}<div class="setup-row"><span>{{ a.teacher.get_full_name|default:a.teacher.username }}</span><small>{{ a.section }} · {{ a.subject.name }}</small></div>{% empty %}<div class="empty-state">No assignments.</div>{% endfor %}</div></div></div></div></div>{% endblock %}
+{% extends 'portal/base.html' %}
+{% block title %}ERP Setup{% endblock %}
+{% block page_heading %}ERP Setup Center{% endblock %}
+
+{% block content %}
+<ul class="nav nav-pills setup-tabs mb-4" role="tablist">
+  <li class="nav-item">
+    <button
+      class="nav-link {% if active_setup_tab == 'profile' %}active{% endif %}"
+      data-bs-toggle="tab"
+      data-bs-target="#profile"
+      type="button">
+      School
+    </button>
+  </li>
+  <li class="nav-item">
+    <button
+      class="nav-link {% if active_setup_tab == 'academic' %}active{% endif %}"
+      data-bs-toggle="tab"
+      data-bs-target="#academic"
+      type="button">
+      Academic
+    </button>
+  </li>
+  <li class="nav-item">
+    <button
+      class="nav-link {% if active_setup_tab == 'exams' %}active{% endif %}"
+      data-bs-toggle="tab"
+      data-bs-target="#exams"
+      type="button">
+      Exams &amp; Fees
+    </button>
+  </li>
+  <li class="nav-item">
+    <button
+      class="nav-link {% if active_setup_tab == 'assignments' %}active{% endif %}"
+      data-bs-toggle="tab"
+      data-bs-target="#assignments"
+      type="button">
+      Assignments
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div
+    class="tab-pane fade {% if active_setup_tab == 'profile' %}show active{% endif %}"
+    id="profile">
+    <div class="panel">
+      <h3>School profile</h3>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="profile">
+        <div class="row g-3">
+          {% for field in forms.profile %}
+            <div class="col-md-6">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary mt-3" type="submit">
+          Save profile
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div
+    class="tab-pane fade {% if active_setup_tab == 'academic' %}show active{% endif %}"
+    id="academic">
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="panel mb-4">
+          <h3>Add academic session</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="session">
+            {{ forms.session.as_p }}
+            <button class="btn btn-primary" type="submit">Add session</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current sessions</h5>
+          {% for session in sessions %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ session.name }}</span>
+                <small>
+                  {{ session.start_date|date:'d-m-Y' }} to {{ session.end_date|date:'d-m-Y' }}
+                  {% if session.is_active %} · Active{% endif %}
+                </small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'session' session.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'session' session.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No academic sessions.</div>
+          {% endfor %}
+        </div>
+
+        <div class="panel">
+          <h3>Add class</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="class">
+            {{ forms.class.as_p }}
+            <button class="btn btn-primary" type="submit">Add class</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current classes</h5>
+          {% for school_class in classes %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ school_class.name }}</span>
+                <small>Order: {{ school_class.order }}</small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'class' school_class.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'class' school_class.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No classes.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="panel mb-4">
+          <h3>Add section</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="section">
+            {{ forms.section.as_p }}
+            <button class="btn btn-primary" type="submit">Add section</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current sections</h5>
+          {% for section in sections %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ section }}</span>
+                <small>
+                  {{ section.class_teacher.get_full_name|default:'No class teacher' }}
+                  · Capacity: {{ section.capacity }}
+                </small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'section' section.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'section' section.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No sections.</div>
+          {% endfor %}
+        </div>
+
+        <div class="panel">
+          <h3>Add subject</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="subject">
+            {{ forms.subject.as_p }}
+            <button class="btn btn-primary" type="submit">Add subject</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current subjects</h5>
+          {% for subject in subjects %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ subject.name }}</span>
+                <small>Code: {{ subject.code }}</small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'subject' subject.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'subject' subject.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No subjects.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="tab-pane fade {% if active_setup_tab == 'exams' %}show active{% endif %}"
+    id="exams">
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="panel">
+          <h3>Create exam</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="exam">
+            {{ forms.exam.as_p }}
+            <button class="btn btn-primary" type="submit">Create exam</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current exams</h5>
+          {% for exam in exams %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ exam.name }} · {{ exam.session }}</span>
+                <small>
+                  {{ exam.start_date|date:'d-m-Y' }} ·
+                  {% if exam.published %}Published{% else %}Draft{% endif %}
+                </small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'exam' exam.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'exam' exam.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No exams.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="panel">
+          <h3>Add fee structure</h3>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="fee">
+            {{ forms.fee.as_p }}
+            <button class="btn btn-primary" type="submit">Add fee head</button>
+          </form>
+
+          <hr>
+          <h5 class="mb-3">Current fee structures</h5>
+          {% for fee in fees %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>{{ fee.school_class }} · {{ fee.name }}</span>
+                <small>₹{{ fee.amount }} · {{ fee.session }}</small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'fee' fee.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'fee' fee.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No fee structures.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="tab-pane fade {% if active_setup_tab == 'assignments' %}show active{% endif %}"
+    id="assignments">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="panel">
+          <h3>Assign teacher</h3>
+          <p class="text-muted">
+            This permission controls who can enter marks for a subject and section.
+          </p>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assignment">
+            {{ forms.assignment.as_p }}
+            <button class="btn btn-primary" type="submit">
+              Create assignment
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="panel">
+          <h3>Current assignments</h3>
+          {% for assignment in assignments %}
+            <div class="setup-row align-items-center gap-3">
+              <div class="flex-grow-1">
+                <span>
+                  {{ assignment.teacher.get_full_name|default:assignment.teacher.username }}
+                </span>
+                <small>{{ assignment.section }} · {{ assignment.subject.name }}</small>
+              </div>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'setup_item_edit' 'assignment' assignment.pk %}">
+                  Edit
+                </a>
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'setup_item_delete' 'assignment' assignment.pk %}">
+                  Delete
+                </a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">No assignments.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
