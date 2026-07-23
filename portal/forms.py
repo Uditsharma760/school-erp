@@ -300,6 +300,23 @@ class SectionForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Class Teacher dropdown में केवल active Teachers दिखेंगे
+        self.fields["class_teacher"].queryset = User.objects.filter(
+            role=User.Role.TEACHER,
+            is_active=True,
+        ).order_by(
+            "first_name",
+            "last_name",
+            "username",
+        )
+
+        # User ID की जगह Teacher का पूरा नाम दिखेगा
+        self.fields["class_teacher"].label_from_instance = (
+            lambda teacher: teacher.get_full_name().strip()
+            or teacher.username
+        )
+
         self.apply_styles()
 
 
