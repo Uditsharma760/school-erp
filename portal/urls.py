@@ -1,41 +1,42 @@
-from django.urls import path, reverse_lazy
 from django.contrib.auth import views as auth_views
+from django.urls import path, reverse_lazy
 
 from . import views
 
+
 urlpatterns = [
     path(
-    "password/forgot/",
-    auth_views.PasswordResetView.as_view(
-        template_name="registration/password_reset_form.html",
-        email_template_name="registration/password_reset_email.txt",
-        subject_template_name="registration/password_reset_subject.txt",
-        success_url=reverse_lazy("password_reset_done"),
+        "password/forgot/",
+        auth_views.PasswordResetView.as_view(
+            template_name="registration/password_reset_form.html",
+            email_template_name="registration/password_reset_email.txt",
+            subject_template_name="registration/password_reset_subject.txt",
+            success_url=reverse_lazy("password_reset_done"),
+        ),
+        name="password_reset",
     ),
-    name="password_reset",
-),
-path(
-    "password/forgot/done/",
-    auth_views.PasswordResetDoneView.as_view(
-        template_name="registration/password_reset_done.html",
+    path(
+        "password/forgot/done/",
+        auth_views.PasswordResetDoneView.as_view(
+            template_name="registration/password_reset_done.html",
+        ),
+        name="password_reset_done",
     ),
-    name="password_reset_done",
-),
-path(
-    "password/reset/<uidb64>/<token>/",
-    auth_views.PasswordResetConfirmView.as_view(
-        template_name="registration/password_reset_confirm.html",
-        success_url=reverse_lazy("password_reset_complete"),
+    path(
+        "password/reset/<uidb64>/<token>/",
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name="registration/password_reset_confirm.html",
+            success_url=reverse_lazy("password_reset_complete"),
+        ),
+        name="password_reset_confirm",
     ),
-    name="password_reset_confirm",
-),
-path(
-    "password/reset/complete/",
-    auth_views.PasswordResetCompleteView.as_view(
-        template_name="registration/password_reset_complete.html",
+    path(
+        "password/reset/complete/",
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name="registration/password_reset_complete.html",
+        ),
+        name="password_reset_complete",
     ),
-    name="password_reset_complete",
-),
     path("", views.home, name="home"),
     path("login/", views.login_view, name="login"),
     path("management/login/", views.management_login, name="management_login"),
@@ -96,6 +97,16 @@ path(
     path("communications/", views.communications, name="communications"),
     path("audit-logs/", views.audit_logs, name="audit_logs"),
 
+    path(
+        "setup/<str:item_type>/<int:pk>/edit/",
+        views.setup_item_edit,
+        name="setup_item_edit",
+    ),
+    path(
+        "setup/<str:item_type>/<int:pk>/delete/",
+        views.setup_item_delete,
+        name="setup_item_delete",
+    ),
     path("setup/", views.setup_center, name="setup_center"),
     path("manifest.webmanifest", views.pwa_manifest, name="pwa_manifest"),
     path("service-worker.js", views.service_worker, name="service_worker"),
