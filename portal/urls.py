@@ -3,7 +3,7 @@ from django.urls import path, reverse_lazy
 
 from . import views
 
-
+x`x
 urlpatterns = [
     path(
         "password/forgot/",
@@ -79,6 +79,11 @@ urlpatterns = [
     path("staff/add/", views.staff_create, name="staff_create"),
     path("staff/<int:pk>/toggle/", views.staff_toggle, name="staff_toggle"),
     path("staff/<int:pk>/reset-password/", views.staff_reset_password, name="staff_reset_password"),
+    path(
+    "staff/<int:pk>/delete/",
+    views.staff_delete,
+    name="staff_delete",
+    ),
 
     path("fees/", views.fee_list, name="fee_list"),
     path("fees/payment/add/", views.fee_payment_create, name="fee_payment_create"),
