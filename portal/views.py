@@ -805,18 +805,45 @@ def staff_list(request):
 def staff_create(request):
     form = StaffForm(request.POST or None)
     credentials = None
+
     if request.method == "POST" and form.is_valid():
         user = form.save(commit=False)
-        user.username = generate_username(user.first_name, user.last_name)
-        password = generate_password()
-        user.set_password(password)
-        user.must_change_password = True
-        user.save()
-        credentials = {"username": user.username, "password": password, "name": user.get_full_name()}
-        audit(request, "STAFF_CREATED", user)
-        form = StaffForm()
-    return render(request, "portal/staff_form.html", {"form": form, "credentials": credentials})
 
+        chosen_password = form.cleaned_data["password1"]
+
+        user.set_password(chosen_password)
+        user.is_active = True
+        user.must_change_password = False
+        user.save()
+
+        credentials = {
+            "username": user.username,
+            "password": chosen_password,
+            "name": user.get_full_name() or user.username,
+        }
+
+        audit(
+            request,
+            "STAFF_CREATED",
+            user,
+            f"Manual User ID created for role {user.role}",
+        )
+
+        messages.success(
+            request,
+            f"Account created successfully for {user.username}.",
+        )
+
+        form = StaffForm()
+
+    return render(
+        request,
+        "portal/staff_form.html",
+        {
+            "form": form,
+            "credentials": credentials,
+        },
+    )
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 @require_POST
