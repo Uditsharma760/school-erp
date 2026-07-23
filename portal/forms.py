@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.utils import timezone
+from django.contrib.auth.password_validation import validate_password
 
 from .models import (
     AcademicSession,
@@ -87,13 +88,61 @@ class PublicStudentRegistrationForm(StudentForm):
 
 
 class StaffForm(StyledFormMixin, forms.ModelForm):
+    username = forms.CharField(
+        label="User ID",
+        max_length=150,
+        help_text=(
+            "Choose a unique User ID. You can use letters, numbers, "
+            "dots, underscores and hyphens."
+        ),
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Example: ravi.teacher",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    password1 = forms.CharField(
+        label="Password",
+        strip=False,
+        help_text=(
+            "Use at least 8 characters. A strong password should include "
+            "uppercase, lowercase, number and special character."
+        ),
+        widget=forms.PasswordInput(
+            attrs={
+                "placeholder": "Create password",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+
+    password2 = forms.CharField(
+        label="Confirm Password",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "placeholder": "Enter password again",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "email", "phone", "role")
+        fields = (
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "role",
+            "username",
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.apply_styles()
+
         self.fields["role"].choices = [
             (User.Role.TEACHER, "Teacher"),
             (User.Role.ACCOUNTANT, "Accountant"),
@@ -101,6 +150,53 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
             (User.Role.PRINCIPAL, "Principal"),
             (User.Role.DIRECTOR, "Director"),
         ]
+
+        self.order_fields(
+            (
+                "first_name",
+                "last_name",
+                "email",
+                "phone",
+                "role",
+                "username",
+                "password1",
+                "password2",
+            )
+        )
+        self.apply_styles()
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip().lower()
+
+        # Apply the same validators used by Django's User model.
+        User._meta.get_field("username").run_validators(username)
+
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError(
+                "This User ID already exists. Choose another User ID."
+            )
+
+        return username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+
+        if password1 and password2 and password1 != password2:
+            self.add_error(
+                "password2",
+                "Password and Confirm Password do not match.",
+            )
+            return cleaned_data
+
+        if password1:
+            try:
+                validate_password(password1, self.instance)
+            except forms.ValidationError as errors:
+                self.add_error("password1", errors)
+
+        return cleaned_data
 
 
 class CustomPasswordChangeForm(StyledFormMixin, PasswordChangeForm):
