@@ -1,2 +1,123 @@
-{% extends 'portal/base.html' %}{% block title %}Fees{% endblock %}{% block page_heading %}Fee Management{% endblock %}
-{% block content %}<div class="panel mb-4"><form class="row g-2" method="get"><div class="col-md-8"><input class="form-control" name="q" value="{{ request.GET.q }}" placeholder="Search student, admission no. or guardian phone"></div><div class="col-md-4 d-flex gap-2"><button class="btn btn-primary">Search</button><a class="btn btn-light" href="{% url 'fee_list' %}">Clear</a><a class="btn btn-success ms-auto" href="{% url 'fee_payment_create' %}"><i class="bi bi-plus-lg"></i> Payment</a></div></form></div><div class="row g-4"><div class="col-lg-8"><div class="panel"><div class="panel-header"><div><h3>Student fee balances</h3><p>Based on class fee structures for the student's session</p></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Student</th><th>Class</th><th>Total</th><th>Paid</th><th>Due</th><th></th></tr></thead><tbody>{% for student in students %}<tr><td><strong>{{ student.full_name }}</strong><small class="d-block text-muted">{{ student.admission_no }}</small></td><td>{{ student.section }}</td><td>₹{{ student.total_fee }}</td><td class="text-success">₹{{ student.fee_paid }}</td><td class="text-danger fw-semibold">₹{{ student.fee_due }}</td><td><a class="btn btn-sm btn-primary" href="{% url 'fee_payment_for_student' student.pk %}">Pay</a></td></tr>{% empty %}<tr><td colspan="6">No students found.</td></tr>{% endfor %}</tbody></table></div></div></div><div class="col-lg-4"><div class="panel"><div class="panel-header"><div><h3>Recent payments</h3><p>Latest receipts</p></div></div>{% for p in recent_payments %}<div class="payment-row"><div><strong>{{ p.student.full_name }}</strong><small>{{ p.receipt_no }} · {{ p.payment_date }}</small></div><span>₹{{ p.amount }}</span></div>{% empty %}<div class="empty-state">No payments yet.</div>{% endfor %}</div></div></div>{% endblock %}
+{% extends 'portal/base.html' %}
+{% block title %}Fees{% endblock %}
+{% block page_heading %}Fee Management{% endblock %}
+
+{% block content %}
+<div class="panel mb-4">
+  <form class="row g-2" method="get">
+    <div class="col-md-8">
+      <input
+        class="form-control"
+        name="q"
+        value="{{ request.GET.q }}"
+        placeholder="Search student, admission no., receipt or reference number">
+    </div>
+    <div class="col-md-4 d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Search</button>
+      <a class="btn btn-light" href="{% url 'fee_list' %}">Clear</a>
+      <a class="btn btn-success ms-auto" href="{% url 'fee_payment_create' %}">
+        <i class="bi bi-plus-lg"></i> Payment
+      </a>
+    </div>
+  </form>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Student fee balances</h3>
+          <p>Based on class fee structures for the student's session</p>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Class</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Due</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in students %}
+              <tr>
+                <td>
+                  <strong>{{ student.full_name }}</strong>
+                  <small class="d-block text-muted">{{ student.admission_no }}</small>
+                </td>
+                <td>{{ student.section }}</td>
+                <td>₹{{ student.total_fee }}</td>
+                <td class="text-success">₹{{ student.fee_paid }}</td>
+                <td class="text-danger fw-semibold">₹{{ student.fee_due }}</td>
+                <td>
+                  <a
+                    class="btn btn-sm btn-primary"
+                    href="{% url 'fee_payment_for_student' student.pk %}">
+                    Pay
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">No students found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Payment history</h3>
+          <p>Edit or delete manual fee receipts</p>
+        </div>
+      </div>
+
+      {% for p in recent_payments %}
+        <div class="payment-row align-items-start gap-2">
+          <div class="flex-grow-1">
+            <strong>{{ p.student.full_name }}</strong>
+            <small class="d-block">
+              {{ p.receipt_no }} · {{ p.payment_date|date:'d-m-Y' }}
+            </small>
+            <small class="d-block text-muted">
+              {{ p.get_mode_display }}
+              {% if p.reference_no %} · {{ p.reference_no }}{% endif %}
+            </small>
+            <span class="fw-semibold">₹{{ p.amount }}</span>
+          </div>
+
+          <div class="d-flex flex-column gap-1 flex-shrink-0">
+            {% if p.mode == 'ONLINE' or p.gateway_payment_id %}
+              <span class="badge text-bg-secondary">Gateway locked</span>
+            {% else %}
+              <a
+                class="btn btn-sm btn-outline-primary"
+                href="{% url 'fee_payment_edit' p.pk %}">
+                Edit
+              </a>
+              {% if request.user.is_management %}
+                <a
+                  class="btn btn-sm btn-outline-danger"
+                  href="{% url 'fee_payment_delete' p.pk %}">
+                  Delete
+                </a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-state">No payments yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
