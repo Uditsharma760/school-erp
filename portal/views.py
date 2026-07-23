@@ -10,11 +10,13 @@ from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models.deletion import ProtectedError, RestrictedError
 from django.db.models import Count, Q, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -103,6 +105,52 @@ PORTAL_ROLE_MAP = {
 }
 
 
+SETUP_ITEM_CONFIG = {
+    "session": {
+        "model": AcademicSession,
+        "form": AcademicSessionForm,
+        "label": "Academic session",
+        "tab": "academic",
+    },
+    "class": {
+        "model": SchoolClass,
+        "form": SchoolClassForm,
+        "label": "Class",
+        "tab": "academic",
+    },
+    "section": {
+        "model": Section,
+        "form": SectionForm,
+        "label": "Section",
+        "tab": "academic",
+    },
+    "subject": {
+        "model": Subject,
+        "form": SubjectForm,
+        "label": "Subject",
+        "tab": "academic",
+    },
+    "exam": {
+        "model": Exam,
+        "form": ExamForm,
+        "label": "Exam",
+        "tab": "exams",
+    },
+    "fee": {
+        "model": FeeStructure,
+        "form": FeeStructureForm,
+        "label": "Fee structure",
+        "tab": "exams",
+    },
+    "assignment": {
+        "model": TeacherAssignment,
+        "form": TeacherAssignmentForm,
+        "label": "Teacher assignment",
+        "tab": "assignments",
+    },
+}
+
+
 def home(request):
     return redirect("dashboard" if request.user.is_authenticated else "login")
 
@@ -117,72 +165,54 @@ def login_view(request, portal=None):
 
     portal_name = portal or "general"
     captcha_namespace = f"login_{portal_name}"
-
-    form = LoginForm(
-        request=request,
-        data=request.POST or None,
-    )
+    form = LoginForm(request=request, data=request.POST or None)
 
     if request.method == "POST":
         valid_captcha, captcha_error = validate_captcha(
             request,
             captcha_namespace,
         )
-
         if not valid_captcha:
             form.add_error(None, captcha_error)
-
         elif form.is_valid():
             candidate = form.get_user()
             expected_roles = PORTAL_ROLE_MAP.get(portal)
 
             if expected_roles and not (
-                candidate.is_superuser
-                or candidate.role in expected_roles
+                candidate.is_superuser or candidate.role in expected_roles
             ):
                 form.add_error(
                     None,
-                    f"This User ID cannot access the "
-                    f"{portal.title()} portal.",
+                    f"This User ID cannot access the {portal.title()} portal.",
                 )
-
             else:
                 auth_login(request, candidate)
-
                 audit(
                     request,
                     "LOGIN",
                     candidate,
                     f"Signed in through {portal_name} portal",
                 )
-
                 next_url = request.GET.get("next", "")
-
                 if next_url and url_has_allowed_host_and_scheme(
                     next_url,
                     allowed_hosts={request.get_host()},
                     require_https=request.is_secure(),
                 ):
                     return redirect(next_url)
-
                 return redirect(_home_for(candidate))
 
     captcha_question = (
         ""
         if settings.TURNSTILE_SITE_KEY
-        else prepare_math_captcha(
-            request,
-            captcha_namespace,
-        )
+        else prepare_math_captcha(request, captcha_namespace)
     )
-
     portal_labels = {
         "management": "Principal / Director",
         "teacher": "Teacher",
         "parent": "Parent / Guardian",
         "student": "Student",
     }
-
     return render(
         request,
         "portal/login.html",
@@ -190,10 +220,7 @@ def login_view(request, portal=None):
             "form": form,
             "captcha_question": captcha_question,
             "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
-            "portal_label": portal_labels.get(
-                portal,
-                "School ERP",
-            ),
+            "portal_label": portal_labels.get(portal, "School ERP"),
             "portal": portal_name,
         },
     )
@@ -1184,38 +1211,172 @@ def setup_center(request):
     profile = SchoolProfile.objects.first() or SchoolProfile()
     form_map = {
         "profile": (SchoolProfileForm, {"instance": profile}),
-        "session": (AcademicSessionForm, {}),
-        "class": (SchoolClassForm, {}),
-        "section": (SectionForm, {}),
-        "subject": (SubjectForm, {}),
-        "exam": (ExamForm, {}),
-        "fee": (FeeStructureForm, {}),
-        "assignment": (TeacherAssignmentForm, {}),
+        **{
+            item_type: (config["form"], {})
+            for item_type, config in SETUP_ITEM_CONFIG.items()
+        },
     }
-    forms = {key: cls(prefix=key, **kwargs) for key, (cls, kwargs) in form_map.items()}
+    forms = {
+        key: form_class(prefix=key, **kwargs)
+        for key, (form_class, kwargs) in form_map.items()
+    }
+
+    active_tab = request.GET.get("tab", "profile")
+    if active_tab not in {"profile", "academic", "exams", "assignments"}:
+        active_tab = "profile"
+
     if request.method == "POST":
         action = request.POST.get("action")
         if action in form_map:
-            cls, kwargs = form_map[action]
-            form = cls(request.POST, request.FILES, prefix=action, **kwargs)
+            form_class, kwargs = form_map[action]
+            form = form_class(
+                request.POST,
+                request.FILES,
+                prefix=action,
+                **kwargs,
+            )
             forms[action] = form
+
             if form.is_valid():
                 obj = form.save()
                 audit(request, f"SETUP_{action.upper()}_SAVED", obj)
                 messages.success(request, f"{action.title()} saved successfully.")
-                return redirect("setup_center")
+
+                target_tab = (
+                    "profile"
+                    if action == "profile"
+                    else SETUP_ITEM_CONFIG[action]["tab"]
+                )
+                return redirect(
+                    f"{reverse('setup_center')}?tab={target_tab}"
+                )
+
+            active_tab = (
+                "profile"
+                if action == "profile"
+                else SETUP_ITEM_CONFIG[action]["tab"]
+            )
+
     return render(
         request,
         "portal/setup_center.html",
         {
             "forms": forms,
+            "active_setup_tab": active_tab,
             "sessions": AcademicSession.objects.all(),
             "classes": SchoolClass.objects.all(),
-            "sections": Section.objects.select_related("school_class", "class_teacher"),
+            "sections": Section.objects.select_related(
+                "school_class",
+                "class_teacher",
+            ),
             "subjects": Subject.objects.all(),
             "exams": Exam.objects.select_related("session"),
-            "fees": FeeStructure.objects.select_related("session", "school_class"),
-            "assignments": TeacherAssignment.objects.select_related("teacher", "section__school_class", "subject"),
+            "fees": FeeStructure.objects.select_related(
+                "session",
+                "school_class",
+            ),
+            "assignments": TeacherAssignment.objects.select_related(
+                "teacher",
+                "section__school_class",
+                "subject",
+            ),
+        },
+    )
+
+
+@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
+def setup_item_edit(request, item_type, pk):
+    config = SETUP_ITEM_CONFIG.get(item_type)
+    if config is None:
+        raise Http404("Unknown setup item type.")
+
+    obj = get_object_or_404(config["model"], pk=pk)
+    form = config["form"](
+        request.POST or None,
+        request.FILES or None,
+        instance=obj,
+        prefix=item_type,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        updated_obj = form.save()
+        audit(
+            request,
+            f"SETUP_{item_type.upper()}_UPDATED",
+            updated_obj,
+        )
+        messages.success(
+            request,
+            f"{config['label']} updated successfully.",
+        )
+        return redirect(
+            f"{reverse('setup_center')}?tab={config['tab']}"
+        )
+
+    return render(
+        request,
+        "portal/setup_item_form.html",
+        {
+            "form": form,
+            "object": obj,
+            "item_type": item_type,
+            "item_label": config["label"],
+            "cancel_url": (
+                f"{reverse('setup_center')}?tab={config['tab']}"
+            ),
+        },
+    )
+
+
+@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
+def setup_item_delete(request, item_type, pk):
+    config = SETUP_ITEM_CONFIG.get(item_type)
+    if config is None:
+        raise Http404("Unknown setup item type.")
+
+    obj = get_object_or_404(config["model"], pk=pk)
+    cancel_url = f"{reverse('setup_center')}?tab={config['tab']}"
+
+    if request.method == "POST":
+        if request.POST.get("confirmation", "").strip().upper() != "DELETE":
+            messages.error(
+                request,
+                'Type DELETE in the confirmation box to continue.',
+            )
+        else:
+            object_text = str(obj)
+            try:
+                obj.delete()
+            except (ProtectedError, RestrictedError) as exc:
+                protected_items = list(getattr(exc, "protected_objects", []))
+                preview = ", ".join(str(item) for item in protected_items[:5])
+                message = (
+                    f"{config['label']} cannot be deleted because other "
+                    "records are linked to it. Remove or move those records first."
+                )
+                if preview:
+                    message += f" Linked records: {preview}"
+                messages.error(request, message)
+            else:
+                audit(
+                    request,
+                    f"SETUP_{item_type.upper()}_DELETED",
+                    description=f"Deleted {config['label']}: {object_text}",
+                )
+                messages.success(
+                    request,
+                    f"{config['label']} deleted successfully.",
+                )
+                return redirect(cancel_url)
+
+    return render(
+        request,
+        "portal/setup_item_confirm_delete.html",
+        {
+            "object": obj,
+            "item_type": item_type,
+            "item_label": config["label"],
+            "cancel_url": cancel_url,
         },
     )
 
