@@ -257,31 +257,49 @@
       </div>
 
 
-      <div class="ms-auto d-flex gap-2">
+      <div class="ms-auto d-flex flex-wrap gap-2 justify-content-end">
 
-        <button
-          type="button"
-          class="btn btn-outline-primary btn-sm d-none"
-          id="installAppBtn">
-          <i class="bi bi-phone"></i>
-          Install App
-        </button>
+  <button
+    type="button"
+    class="btn btn-outline-primary btn-sm d-none"
+    id="installAppBtn">
 
-        <a
-          href="{% url 'change_password' %}"
-          class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-key"></i>
-          Password
-        </a>
+    <i class="bi bi-phone"></i>
+    Install App
+  </button>
 
-        <a
-          href="{% url 'logout' %}"
-          class="btn btn-primary btn-sm">
-          <i class="bi bi-box-arrow-right"></i>
-          Logout
-        </a>
 
-      </div>
+  {% if user.role == 'DIRECTOR' %}
+
+    <a
+      href="{% url 'change_my_username' %}"
+      class="btn btn-outline-secondary btn-sm">
+
+      <i class="bi bi-person-vcard"></i>
+      User ID
+    </a>
+
+  {% endif %}
+
+
+  <a
+    href="{% url 'change_password' %}"
+    class="btn btn-outline-secondary btn-sm">
+
+    <i class="bi bi-key"></i>
+    Password
+  </a>
+
+
+  <a
+    href="{% url 'logout' %}"
+    class="btn btn-primary btn-sm">
+
+    <i class="bi bi-box-arrow-right"></i>
+    Logout
+  </a>
+
+</div>
 
     </header>
 
