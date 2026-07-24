@@ -14,6 +14,13 @@ urlpatterns = [
         ),
         name="password_reset",
     ),
+
+    path(
+    "account/change-username/",
+    views.change_my_username,
+    name="change_my_username",
+    ),
+    
     path(
         "password/forgot/done/",
         auth_views.PasswordResetDoneView.as_view(
@@ -82,6 +89,11 @@ urlpatterns = [
     "staff/<int:pk>/delete/",
     views.staff_delete,
     name="staff_delete",
+    ),
+    path(
+    "staff/<int:pk>/change-username/",
+    views.staff_change_username,
+    name="staff_change_username",
     ),
 
     path("fees/", views.fee_list, name="fee_list"),
