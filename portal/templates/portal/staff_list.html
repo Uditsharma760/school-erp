@@ -11,7 +11,7 @@
       <h3>Staff Accounts</h3>
       <p>
         Create accounts, activate or deactivate users,
-        set passwords and remove inactive accounts.
+        set passwords, change User IDs and remove inactive accounts.
       </p>
     </div>
 
@@ -23,6 +23,7 @@
 
   <div class="table-responsive">
     <table class="table align-middle">
+
       <thead>
         <tr>
           <th>Staff</th>
@@ -34,8 +35,11 @@
       </thead>
 
       <tbody>
+
         {% for person in staff %}
+
           <tr>
+
             <td>
               <strong>
                 {{ person.get_full_name|default:person.username }}
@@ -43,94 +47,226 @@
 
               <small class="d-block text-muted">
                 {{ person.email|default:'No email' }}
+
                 {% if person.phone %}
                   · {{ person.phone }}
                 {% endif %}
               </small>
             </td>
 
+
             <td>
               <code>{{ person.username }}</code>
             </td>
+
 
             <td>
               {{ person.get_role_display }}
             </td>
 
+
             <td>
               {% if person.is_active %}
-                <span class="badge text-bg-success">Active</span>
+                <span class="badge text-bg-success">
+                  Active
+                </span>
               {% else %}
-                <span class="badge text-bg-secondary">Inactive</span>
+                <span class="badge text-bg-secondary">
+                  Inactive
+                </span>
               {% endif %}
             </td>
 
+
             <td class="text-end">
+
               <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
 
-                {% if request.user.role != 'PRINCIPAL' or person.role != 'DIRECTOR' %}
+                <!-- ===================================== -->
+                <!-- SET PASSWORD AND CHANGE USER ID -->
+                <!-- ===================================== -->
+
+                {% if request.user.role == 'DIRECTOR' %}
+
                   <a
                     href="{% url 'staff_reset_password' person.pk %}"
                     class="btn btn-sm btn-outline-primary">
+
                     <i class="bi bi-key-fill"></i>
                     Set Password
                   </a>
+
+
+                  <a
+                    href="{% url 'staff_change_username' person.pk %}"
+                    class="btn btn-sm btn-outline-secondary">
+
+                    <i class="bi bi-person-vcard-fill"></i>
+                    Change User ID
+                  </a>
+
+
+                {% elif person.role != 'DIRECTOR' and person.role != 'PRINCIPAL' %}
+
+                  <a
+                    href="{% url 'staff_reset_password' person.pk %}"
+                    class="btn btn-sm btn-outline-primary">
+
+                    <i class="bi bi-key-fill"></i>
+                    Set Password
+                  </a>
+
                 {% endif %}
+
+
+                <!-- ===================================== -->
+                <!-- ACTIVATE OR DEACTIVATE -->
+                <!-- ===================================== -->
 
                 {% if person.pk != request.user.pk %}
-                  <form
-                    method="post"
-                    action="{% url 'staff_toggle' person.pk %}"
-                    class="d-inline">
-                    {% csrf_token %}
 
-                    {% if person.is_active %}
-                      <button
-                        type="submit"
-                        class="btn btn-sm btn-outline-warning">
-                        <i class="bi bi-person-dash-fill"></i>
-                        Deactivate
-                      </button>
-                    {% else %}
-                      <button
-                        type="submit"
-                        class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-person-check-fill"></i>
-                        Activate
-                      </button>
-                    {% endif %}
-                  </form>
+                  {% if request.user.role == 'DIRECTOR' %}
+
+                    <form
+                      method="post"
+                      action="{% url 'staff_toggle' person.pk %}"
+                      class="d-inline">
+
+                      {% csrf_token %}
+
+                      {% if person.is_active %}
+
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-outline-warning">
+
+                          <i class="bi bi-person-dash-fill"></i>
+                          Deactivate
+                        </button>
+
+                      {% else %}
+
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-outline-success">
+
+                          <i class="bi bi-person-check-fill"></i>
+                          Activate
+                        </button>
+
+                      {% endif %}
+
+                    </form>
+
+
+                  {% elif person.role != 'DIRECTOR' and person.role != 'PRINCIPAL' %}
+
+                    <form
+                      method="post"
+                      action="{% url 'staff_toggle' person.pk %}"
+                      class="d-inline">
+
+                      {% csrf_token %}
+
+                      {% if person.is_active %}
+
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-outline-warning">
+
+                          <i class="bi bi-person-dash-fill"></i>
+                          Deactivate
+                        </button>
+
+                      {% else %}
+
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-outline-success">
+
+                          <i class="bi bi-person-check-fill"></i>
+                          Activate
+                        </button>
+
+                      {% endif %}
+
+                    </form>
+
+                  {% endif %}
+
                 {% endif %}
 
+
+                <!-- ===================================== -->
+                <!-- DELETE INACTIVE ACCOUNT -->
+                <!-- ===================================== -->
+
                 {% if not person.is_active and person.pk != request.user.pk %}
-                  {% if request.user.role != 'PRINCIPAL' or person.role != 'DIRECTOR' %}
+
+                  {% if request.user.role == 'DIRECTOR' %}
+
                     <a
                       href="{% url 'staff_delete' person.pk %}"
                       class="btn btn-sm btn-outline-danger">
+
                       <i class="bi bi-trash-fill"></i>
                       Delete
                     </a>
+
+
+                  {% elif person.role != 'DIRECTOR' and person.role != 'PRINCIPAL' %}
+
+                    <a
+                      href="{% url 'staff_delete' person.pk %}"
+                      class="btn btn-sm btn-outline-danger">
+
+                      <i class="bi bi-trash-fill"></i>
+                      Delete
+                    </a>
+
                   {% endif %}
+
                 {% endif %}
 
               </div>
+
             </td>
+
           </tr>
 
+
         {% empty %}
+
           <tr>
             <td colspan="5" class="empty-state">
               No staff accounts found.
             </td>
           </tr>
+
         {% endfor %}
+
       </tbody>
+
     </table>
   </div>
 
+
   <div class="alert alert-light border mt-3 mb-0">
-    The Delete button appears only after an account is deactivated.
-    Your own account and superuser accounts cannot be deleted here.
+
+    <strong>Account permissions:</strong>
+
+    <br>
+
+    Director can set passwords and change User IDs for all staff.
+
+    <br>
+
+    Principal can manage only Teacher, Accountant and Transport accounts.
+
+    <br>
+
+    Delete button appears only after an account is deactivated.
+
   </div>
 
 </div>
