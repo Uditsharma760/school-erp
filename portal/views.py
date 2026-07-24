@@ -1,4 +1,4 @@
-import json
+    import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
@@ -10,21 +10,17 @@ from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models.deletion import ProtectedError, RestrictedError
 from django.db.models import Count, Q, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .decorators import roles_required
 from .forms import (
-    StaffPasswordResetForm,
     AcademicSessionForm,
-    StaffUsernameChangeForm,
     CommunicationForm,
     CustomPasswordChangeForm,
     ExamForm,
@@ -104,52 +100,6 @@ PORTAL_ROLE_MAP = {
     "teacher": {User.Role.TEACHER},
     "parent": {User.Role.PARENT},
     "student": {User.Role.STUDENT},
-}
-
-
-SETUP_ITEM_CONFIG = {
-    "session": {
-        "model": AcademicSession,
-        "form": AcademicSessionForm,
-        "label": "Academic session",
-        "tab": "academic",
-    },
-    "class": {
-        "model": SchoolClass,
-        "form": SchoolClassForm,
-        "label": "Class",
-        "tab": "academic",
-    },
-    "section": {
-        "model": Section,
-        "form": SectionForm,
-        "label": "Section",
-        "tab": "academic",
-    },
-    "subject": {
-        "model": Subject,
-        "form": SubjectForm,
-        "label": "Subject",
-        "tab": "academic",
-    },
-    "exam": {
-        "model": Exam,
-        "form": ExamForm,
-        "label": "Exam",
-        "tab": "exams",
-    },
-    "fee": {
-        "model": FeeStructure,
-        "form": FeeStructureForm,
-        "label": "Fee structure",
-        "tab": "exams",
-    },
-    "assignment": {
-        "model": TeacherAssignment,
-        "form": TeacherAssignmentForm,
-        "label": "Teacher assignment",
-        "tab": "assignments",
-    },
 }
 
 
@@ -263,43 +213,6 @@ def change_password(request):
         messages.success(request, "Password changed successfully.")
         return redirect("dashboard")
     return render(request, "portal/form_page.html", {"form": form, "title": "Change password", "submit_label": "Update password"})
-
-
-@roles_required(User.Role.DIRECTOR)
-def change_my_username(request):
-    form = StaffUsernameChangeForm(
-        request.POST or None,
-        instance=request.user,
-    )
-
-    if request.method == "POST" and form.is_valid():
-        old_username = request.user.username
-        user = form.save()
-
-        audit(
-            request,
-            "USERNAME_CHANGED",
-            user,
-            f"User ID changed from {old_username} to {user.username}",
-        )
-
-        messages.success(
-            request,
-            "Your User ID was changed successfully. "
-            "Use the new User ID on your next login.",
-        )
-
-        return redirect("dashboard")
-
-    return render(
-        request,
-        "portal/form_page.html",
-        {
-            "form": form,
-            "title": "Change My User ID",
-            "submit_label": "Update User ID",
-        },
-    )
 
 
 @login_required
@@ -842,50 +755,20 @@ def staff_list(request):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 def staff_create(request):
-    form = StaffForm(
-    request.POST or None,
-    actor=request.user,
-)
+    form = StaffForm(request.POST or None)
     credentials = None
-
     if request.method == "POST" and form.is_valid():
         user = form.save(commit=False)
-
-        chosen_password = form.cleaned_data["password1"]
-
-        user.set_password(chosen_password)
-        user.is_active = True
-        user.must_change_password = False
+        user.username = generate_username(user.first_name, user.last_name)
+        password = generate_password()
+        user.set_password(password)
+        user.must_change_password = True
         user.save()
-
-        credentials = {
-            "username": user.username,
-            "password": chosen_password,
-            "name": user.get_full_name() or user.username,
-        }
-
-        audit(
-            request,
-            "STAFF_CREATED",
-            user,
-            f"Manual User ID created for role {user.role}",
-        )
-
-        messages.success(
-            request,
-            f"Account created successfully for {user.username}.",
-        )
-
+        credentials = {"username": user.username, "password": password, "name": user.get_full_name()}
+        audit(request, "STAFF_CREATED", user)
         form = StaffForm()
+    return render(request, "portal/staff_form.html", {"form": form, "credentials": credentials})
 
-    return render(
-        request,
-        "portal/staff_form.html",
-        {
-            "form": form,
-            "credentials": credentials,
-        },
-    )
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 @require_POST
@@ -901,243 +784,29 @@ def staff_toggle(request, pk):
     return redirect("staff_list")
 
 
-@roles_required(User.Role.DIRECTOR)
-def staff_change_username(request, pk):
-    staff = get_object_or_404(
-        User,
-        pk=pk,
-        role__in=[
-            User.Role.DIRECTOR,
-            User.Role.PRINCIPAL,
-            User.Role.TEACHER,
-            User.Role.ACCOUNTANT,
-            User.Role.TRANSPORT,
-        ],
-    )
-
-    form = StaffUsernameChangeForm(
-        request.POST or None,
-        instance=staff,
-    )
-
-    if request.method == "POST" and form.is_valid():
-        old_username = staff.username
-        updated_staff = form.save()
-
-        audit(
-            request,
-            "STAFF_USERNAME_CHANGED",
-            updated_staff,
-            (
-                f"User ID changed from {old_username} "
-                f"to {updated_staff.username}"
-            ),
-        )
-
-        messages.success(
-            request,
-            f"User ID changed successfully to "
-            f"{updated_staff.username}.",
-        )
-
-        return redirect("staff_list")
-
-    return render(
-        request,
-        "portal/form_page.html",
-        {
-            "form": form,
-            "title": (
-                "Change User ID — "
-                f"{staff.get_full_name() or staff.username}"
-            ),
-            "submit_label": "Update User ID",
-        },
-    )
-
-
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 def staff_reset_password(request, pk):
-    staff = get_object_or_404(
-        User,
-        pk=pk,
-        is_superuser=False,
-        role__in=[
-            User.Role.DIRECTOR,
-            User.Role.PRINCIPAL,
-            User.Role.TEACHER,
-            User.Role.ACCOUNTANT,
-            User.Role.TRANSPORT,
-        ],
-    )
-
-    # A Principal must not take control of a Director account.
-   if (
-    request.user.role == User.Role.PRINCIPAL
-    and staff.role in {
-        User.Role.DIRECTOR,
-        User.Role.PRINCIPAL,
-    }
-   ):
-       
-    messages.error(
-    request,
-    "A Principal cannot reset a Director or Principal account password.",
-   )
-    return redirect("staff_list")
-
-    form = StaffPasswordResetForm(
-        staff,
-        request.POST or None,
-    )
-
-    if request.method == "POST" and form.is_valid():
-        updated_staff = form.save(commit=True)
-
-        # Management has already chosen the final password.
-        updated_staff.must_change_password = False
-        updated_staff.save(update_fields=["must_change_password"])
-
-        audit(
-            request,
-            "STAFF_PASSWORD_RESET",
-            updated_staff,
-            f"Password manually reset for {updated_staff.username}",
-        )
-
-        messages.success(
-            request,
-            f"New password saved successfully for "
-            f"{updated_staff.username}.",
-        )
-        return redirect("staff_list")
-
-    return render(
-        request,
-        "portal/staff_password_reset.html",
-        {
-            "form": form,
-            "staff_member": staff,
-        },
-    )
-
-@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
-def staff_delete(request, pk):
-    staff = get_object_or_404(
-        User,
-        pk=pk,
-        is_superuser=False,
-        role__in=[
-            User.Role.DIRECTOR,
-            User.Role.PRINCIPAL,
-            User.Role.TEACHER,
-            User.Role.ACCOUNTANT,
-            User.Role.TRANSPORT,
-        ],
-    )
-
-    if staff.pk == request.user.pk:
-        messages.error(request, "You cannot delete your own account.")
-        return redirect("staff_list")
-
-    if staff.is_active:
-        messages.error(
-            request,
-            "Deactivate this account before deleting it.",
-        )
-        return redirect("staff_list")
-
-    # A Principal must not delete a Director account.
-    if (
-        request.user.role == User.Role.PRINCIPAL
-        and staff.role == User.Role.DIRECTOR
-    ):
-        messages.error(
-            request,
-            "A Principal cannot delete a Director account.",
-        )
-        return redirect("staff_list")
-
-    if request.method == "POST":
-        confirmation = request.POST.get(
-            "confirmation",
-            "",
-        ).strip().upper()
-
-        if confirmation != "DELETE":
-            messages.error(
-                request,
-                "Type DELETE exactly to confirm account deletion.",
-            )
-        else:
-            username = staff.username
-            full_name = staff.get_full_name() or username
-            role_name = staff.get_role_display()
-
-            try:
-                with transaction.atomic():
-                    staff.delete()
-            except ProtectedError:
-                messages.error(
-                    request,
-                    "This account is linked to protected school records "
-                    "and cannot be deleted. Keep it inactive instead.",
-                )
-            else:
-                audit(
-                    request,
-                    "STAFF_DELETED",
-                    description=(
-                        f"Deleted inactive staff account: "
-                        f"{username} ({role_name})"
-                    ),
-                )
-                messages.success(
-                    request,
-                    f"Inactive account {full_name} ({username}) "
-                    f"was deleted.",
-                )
-                return redirect("staff_list")
-
-    return render(
-        request,
-        "portal/staff_confirm_delete.html",
-        {
-            "staff_member": staff,
-        },
-    )
+    staff = get_object_or_404(User, pk=pk, is_superuser=False)
+    password = generate_password()
+    staff.set_password(password)
+    staff.must_change_password = True
+    staff.save(update_fields=["password", "must_change_password"])
+    audit(request, "STAFF_PASSWORD_RESET", staff)
+    return render(request, "portal/credentials.html", {"credentials": {"username": staff.username, "password": password, "name": staff.get_full_name()}})
 
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
 def fee_list(request):
-    students = Student.objects.filter(
-        status=Student.Status.ACTIVE,
-    ).select_related("section__school_class", "session")
-    payments = FeePayment.objects.select_related("student", "received_by")
-
+    students = Student.objects.filter(status=Student.Status.ACTIVE).select_related("section__school_class", "session")
     q = request.GET.get("q", "").strip()
     if q:
-        student_filter = (
-            Q(admission_no__icontains=q)
-            | Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-            | Q(guardian_phone__icontains=q)
-        )
-        students = students.filter(student_filter)
-        payments = payments.filter(
-            Q(student__admission_no__icontains=q)
-            | Q(student__first_name__icontains=q)
-            | Q(student__last_name__icontains=q)
-            | Q(receipt_no__icontains=q)
-            | Q(reference_no__icontains=q)
-        )
-
+        students = students.filter(Q(admission_no__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(guardian_phone__icontains=q))
     return render(
         request,
         "portal/fee_list.html",
         {
             "students": students[:500],
-            "recent_payments": payments[:200],
+            "recent_payments": FeePayment.objects.select_related("student")[:10],
             "online_orders": PaymentOrder.objects.select_related("student")[:10],
             "payment_enabled": payment_gateway_configured(),
         },
@@ -1146,11 +815,7 @@ def fee_list(request):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
 def fee_payment_create(request, student_id=None):
-    initial = {
-        "student": student_id,
-        "payment_date": timezone.localdate(),
-        "receipt_no": f"RCPT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
-    }
+    initial = {"student": student_id, "payment_date": timezone.localdate(), "receipt_no": f"RCPT-{timezone.now().strftime('%Y%m%d%H%M%S')}"}
     form = FeePaymentForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         payment = form.save(commit=False)
@@ -1159,91 +824,7 @@ def fee_payment_create(request, student_id=None):
         audit(request, "FEE_RECORDED", payment)
         messages.success(request, "Fee payment recorded.")
         return redirect("student_detail", pk=payment.student_id)
-    return render(
-        request,
-        "portal/form_page.html",
-        {
-            "form": form,
-            "title": "Record fee payment",
-            "submit_label": "Save payment",
-        },
-    )
-
-
-@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL, User.Role.ACCOUNTANT)
-def fee_payment_edit(request, pk):
-    payment = get_object_or_404(
-        FeePayment.objects.select_related("student", "received_by"),
-        pk=pk,
-    )
-
-    # Gateway-created receipts must stay consistent with Razorpay records.
-    if payment.mode == FeePayment.Mode.ONLINE or payment.gateway_payment_id:
-        messages.error(
-            request,
-            "Online gateway payments are locked. Use Razorpay refund/reconciliation instead of editing the receipt.",
-        )
-        return redirect("fee_list")
-
-    form = FeePaymentForm(request.POST or None, instance=payment)
-    if request.method == "POST" and form.is_valid():
-        updated_payment = form.save()
-        audit(request, "FEE_PAYMENT_UPDATED", updated_payment)
-        messages.success(request, "Fee payment updated successfully.")
-        return redirect("fee_list")
-
-    return render(
-        request,
-        "portal/form_page.html",
-        {
-            "form": form,
-            "title": f"Edit fee payment — {payment.receipt_no}",
-            "submit_label": "Update payment",
-        },
-    )
-
-
-@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
-def fee_payment_delete(request, pk):
-    payment = get_object_or_404(
-        FeePayment.objects.select_related("student", "received_by"),
-        pk=pk,
-    )
-
-    # Never silently remove a gateway payment from the ERP ledger.
-    if payment.mode == FeePayment.Mode.ONLINE or payment.gateway_payment_id:
-        messages.error(
-            request,
-            "Online gateway payments cannot be deleted here. Reconcile or refund them through Razorpay.",
-        )
-        return redirect("fee_list")
-
-    if request.method == "POST":
-        if request.POST.get("confirmation", "").strip().upper() != "DELETE":
-            messages.error(
-                request,
-                'Type DELETE in the confirmation box to continue.',
-            )
-        else:
-            receipt_no = payment.receipt_no
-            payment_text = str(payment)
-            payment.delete()
-            audit(
-                request,
-                "FEE_PAYMENT_DELETED",
-                description=f"Deleted fee payment: {payment_text}",
-            )
-            messages.success(
-                request,
-                f"Fee payment {receipt_no} deleted successfully.",
-            )
-            return redirect("fee_list")
-
-    return render(
-        request,
-        "portal/fee_payment_confirm_delete.html",
-        {"payment": payment},
-    )
+    return render(request, "portal/form_page.html", {"form": form, "title": "Record fee payment", "submit_label": "Save payment"})
 
 
 @login_required
@@ -1582,172 +1163,38 @@ def setup_center(request):
     profile = SchoolProfile.objects.first() or SchoolProfile()
     form_map = {
         "profile": (SchoolProfileForm, {"instance": profile}),
-        **{
-            item_type: (config["form"], {})
-            for item_type, config in SETUP_ITEM_CONFIG.items()
-        },
+        "session": (AcademicSessionForm, {}),
+        "class": (SchoolClassForm, {}),
+        "section": (SectionForm, {}),
+        "subject": (SubjectForm, {}),
+        "exam": (ExamForm, {}),
+        "fee": (FeeStructureForm, {}),
+        "assignment": (TeacherAssignmentForm, {}),
     }
-    forms = {
-        key: form_class(prefix=key, **kwargs)
-        for key, (form_class, kwargs) in form_map.items()
-    }
-
-    active_tab = request.GET.get("tab", "profile")
-    if active_tab not in {"profile", "academic", "exams", "assignments"}:
-        active_tab = "profile"
-
+    forms = {key: cls(prefix=key, **kwargs) for key, (cls, kwargs) in form_map.items()}
     if request.method == "POST":
         action = request.POST.get("action")
         if action in form_map:
-            form_class, kwargs = form_map[action]
-            form = form_class(
-                request.POST,
-                request.FILES,
-                prefix=action,
-                **kwargs,
-            )
+            cls, kwargs = form_map[action]
+            form = cls(request.POST, request.FILES, prefix=action, **kwargs)
             forms[action] = form
-
             if form.is_valid():
                 obj = form.save()
                 audit(request, f"SETUP_{action.upper()}_SAVED", obj)
                 messages.success(request, f"{action.title()} saved successfully.")
-
-                target_tab = (
-                    "profile"
-                    if action == "profile"
-                    else SETUP_ITEM_CONFIG[action]["tab"]
-                )
-                return redirect(
-                    f"{reverse('setup_center')}?tab={target_tab}"
-                )
-
-            active_tab = (
-                "profile"
-                if action == "profile"
-                else SETUP_ITEM_CONFIG[action]["tab"]
-            )
-
+                return redirect("setup_center")
     return render(
         request,
         "portal/setup_center.html",
         {
             "forms": forms,
-            "active_setup_tab": active_tab,
             "sessions": AcademicSession.objects.all(),
             "classes": SchoolClass.objects.all(),
-            "sections": Section.objects.select_related(
-                "school_class",
-                "class_teacher",
-            ),
+            "sections": Section.objects.select_related("school_class", "class_teacher"),
             "subjects": Subject.objects.all(),
             "exams": Exam.objects.select_related("session"),
-            "fees": FeeStructure.objects.select_related(
-                "session",
-                "school_class",
-            ),
-            "assignments": TeacherAssignment.objects.select_related(
-                "teacher",
-                "section__school_class",
-                "subject",
-            ),
-        },
-    )
-
-
-@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
-def setup_item_edit(request, item_type, pk):
-    config = SETUP_ITEM_CONFIG.get(item_type)
-    if config is None:
-        raise Http404("Unknown setup item type.")
-
-    obj = get_object_or_404(config["model"], pk=pk)
-    form = config["form"](
-        request.POST or None,
-        request.FILES or None,
-        instance=obj,
-        prefix=item_type,
-    )
-
-    if request.method == "POST" and form.is_valid():
-        updated_obj = form.save()
-        audit(
-            request,
-            f"SETUP_{item_type.upper()}_UPDATED",
-            updated_obj,
-        )
-        messages.success(
-            request,
-            f"{config['label']} updated successfully.",
-        )
-        return redirect(
-            f"{reverse('setup_center')}?tab={config['tab']}"
-        )
-
-    return render(
-        request,
-        "portal/setup_item_form.html",
-        {
-            "form": form,
-            "object": obj,
-            "item_type": item_type,
-            "item_label": config["label"],
-            "cancel_url": (
-                f"{reverse('setup_center')}?tab={config['tab']}"
-            ),
-        },
-    )
-
-
-@roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
-def setup_item_delete(request, item_type, pk):
-    config = SETUP_ITEM_CONFIG.get(item_type)
-    if config is None:
-        raise Http404("Unknown setup item type.")
-
-    obj = get_object_or_404(config["model"], pk=pk)
-    cancel_url = f"{reverse('setup_center')}?tab={config['tab']}"
-
-    if request.method == "POST":
-        if request.POST.get("confirmation", "").strip().upper() != "DELETE":
-            messages.error(
-                request,
-                'Type DELETE in the confirmation box to continue.',
-            )
-        else:
-            object_text = str(obj)
-            try:
-                obj.delete()
-            except (ProtectedError, RestrictedError) as exc:
-                protected_items = list(getattr(exc, "protected_objects", []))
-                preview = ", ".join(str(item) for item in protected_items[:5])
-                message = (
-                    f"{config['label']} cannot be deleted because other "
-                    "records are linked to it. Remove or move those records first."
-                )
-                if preview:
-                    message += f" Linked records: {preview}"
-                messages.error(request, message)
-            else:
-                audit(
-                    request,
-                    f"SETUP_{item_type.upper()}_DELETED",
-                    description=f"Deleted {config['label']}: {object_text}",
-                )
-                messages.success(
-                    request,
-                    f"{config['label']} deleted successfully.",
-                )
-                return redirect(cancel_url)
-
-    return render(
-        request,
-        "portal/setup_item_confirm_delete.html",
-        {
-            "object": obj,
-            "item_type": item_type,
-            "item_label": config["label"],
-            "cancel_url": cancel_url,
+            "fees": FeeStructure.objects.select_related("session", "school_class"),
+            "assignments": TeacherAssignment.objects.select_related("teacher", "section__school_class", "subject"),
         },
     )
 
