@@ -125,6 +125,30 @@ X_FRAME_OPTIONS = "DENY"
 
 # Session and upload hardening
 SESSION_COOKIE_HTTPONLY = True
+# ==================================================
+# SCHOOL ERP SESSION SECURITY
+# ==================================================
+
+# 30 minutes inactivity ke baad session expire hoga
+SESSION_COOKIE_AGE = 10 * 60
+
+# Har request par 30-minute timer dobara start hoga
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Browser poori tarah close hone par session cookie expire hogi
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# Session cookie JavaScript se access nahi ho sakegi
+SESSION_COOKIE_HTTPONLY = True
+
+# Normal same-site security
+SESSION_COOKIE_SAMESITE = "Lax"
+
+# HTTPS website par secure cookie
+SESSION_COOKIE_SECURE = True
+
+# Purane logged-in sessions ko ek baar force logout karega
+SESSION_COOKIE_NAME = "schoolerp_sessionid_v2"
 CSRF_COOKIE_HTTPONLY = False
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
