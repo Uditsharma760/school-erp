@@ -266,6 +266,48 @@ class StaffPasswordResetForm(StyledFormMixin, SetPasswordForm):
         self.apply_styles()
 
 
+class StaffUsernameChangeForm(StyledFormMixin, forms.ModelForm):
+    username = forms.CharField(
+        label="New User ID",
+        max_length=150,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Enter new User ID",
+                "autocomplete": "off",
+            }
+        ),
+        help_text=(
+            "Use letters, numbers, dots, underscores or hyphens."
+        ),
+    )
+
+    class Meta:
+        model = User
+        fields = ("username",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.apply_styles()
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip().lower()
+
+        User._meta.get_field("username").run_validators(username)
+
+        duplicate = User.objects.filter(
+            username__iexact=username,
+        ).exclude(
+            pk=self.instance.pk,
+        )
+
+        if duplicate.exists():
+            raise forms.ValidationError(
+                "This User ID already exists. Choose another User ID."
+            )
+
+        return username
+
+
 class FeePaymentForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = FeePayment
