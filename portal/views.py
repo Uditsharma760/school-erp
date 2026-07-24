@@ -1,4 +1,4 @@
-    import json
+import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
