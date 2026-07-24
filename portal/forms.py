@@ -145,67 +145,67 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
         )
 
     def __init__(self, *args, actor=None, **kwargs):
-    self.actor = actor
+        self.actor = actor
 
-    super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    role_choices = [
-        (User.Role.TEACHER, "Teacher"),
-        (User.Role.ACCOUNTANT, "Accountant"),
-        (User.Role.TRANSPORT, "Transport Manager"),
-    ]
+        self.fields["first_name"].required = True
+        self.fields["last_name"].required = True
 
-    # केवल Director ही Principal या दूसरा Director बना सकेगा
-    if actor and actor.role == User.Role.DIRECTOR:
-        role_choices.extend(
-            [
-                (User.Role.PRINCIPAL, "Principal"),
-                (User.Role.DIRECTOR, "Director"),
-            ]
+        role_choices = [
+            (User.Role.TEACHER, "Teacher"),
+            (User.Role.ACCOUNTANT, "Accountant"),
+            (User.Role.TRANSPORT, "Transport Manager"),
+        ]
+
+        # केवल Director ही Principal या Director account बना सकता है
+        if actor and actor.role == User.Role.DIRECTOR:
+            role_choices.extend(
+                [
+                    (User.Role.PRINCIPAL, "Principal"),
+                    (User.Role.DIRECTOR, "Director"),
+                ]
+            )
+
+        self.fields["role"].choices = role_choices
+
+        self.order_fields(
+            (
+                "first_name",
+                "last_name",
+                "email",
+                "phone",
+                "role",
+                "username",
+                "password1",
+                "password2",
+            )
         )
 
-    self.fields["role"].choices = role_choices
-
-    self.order_fields(
-        (
-            "first_name",
-            "last_name",
-            "email",
-            "phone",
-            "role",
-            "username",
-            "password1",
-            "password2",
-        )
-    )
-
-    self.apply_styles()
-
+        self.apply_styles()
 
     def clean_role(self):
-    role = self.cleaned_data.get("role")
+        role = self.cleaned_data.get("role")
 
-    protected_roles = {
-        User.Role.DIRECTOR,
-        User.Role.PRINCIPAL,
-    }
+        protected_roles = {
+            User.Role.DIRECTOR,
+            User.Role.PRINCIPAL,
+        }
 
-    if (
-        self.actor
-        and self.actor.role != User.Role.DIRECTOR
-        and role in protected_roles
-    ):
-        raise forms.ValidationError(
-            "Only a Director can create a Director or Principal account."
-        )
+        if (
+            self.actor
+            and self.actor.role != User.Role.DIRECTOR
+            and role in protected_roles
+        ):
+            raise forms.ValidationError(
+                "Only a Director can create a Director or Principal account."
+            )
 
-    return role
-    
+        return role
 
     def clean_username(self):
         username = self.cleaned_data["username"].strip().lower()
 
-        # Apply the same validators used by Django's User model.
         User._meta.get_field("username").run_validators(username)
 
         if User.objects.filter(username__iexact=username).exists():
@@ -217,6 +217,7 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
         password1 = cleaned_data.get("password1")
         password2 = cleaned_data.get("password2")
 
@@ -225,13 +226,21 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
                 "password2",
                 "Password and Confirm Password do not match.",
             )
+
             return cleaned_data
 
         if password1:
             try:
-                validate_password(password1, self.instance)
+                validate_password(
+                    password1,
+                    self.instance,
+                )
+
             except forms.ValidationError as errors:
-                self.add_error("password1", errors)
+                self.add_error(
+                    "password1",
+                    errors,
+                )
 
         return cleaned_data
 
