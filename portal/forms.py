@@ -144,30 +144,63 @@ class StaffForm(StyledFormMixin, forms.ModelForm):
             "username",
         )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, actor=None, **kwargs):
+    self.actor = actor
 
-        self.fields["role"].choices = [
-            (User.Role.TEACHER, "Teacher"),
-            (User.Role.ACCOUNTANT, "Accountant"),
-            (User.Role.TRANSPORT, "Transport Manager"),
-            (User.Role.PRINCIPAL, "Principal"),
-            (User.Role.DIRECTOR, "Director"),
-        ]
+    super().__init__(*args, **kwargs)
 
-        self.order_fields(
-            (
-                "first_name",
-                "last_name",
-                "email",
-                "phone",
-                "role",
-                "username",
-                "password1",
-                "password2",
-            )
+    role_choices = [
+        (User.Role.TEACHER, "Teacher"),
+        (User.Role.ACCOUNTANT, "Accountant"),
+        (User.Role.TRANSPORT, "Transport Manager"),
+    ]
+
+    # केवल Director ही Principal या दूसरा Director बना सकेगा
+    if actor and actor.role == User.Role.DIRECTOR:
+        role_choices.extend(
+            [
+                (User.Role.PRINCIPAL, "Principal"),
+                (User.Role.DIRECTOR, "Director"),
+            ]
         )
-        self.apply_styles()
+
+    self.fields["role"].choices = role_choices
+
+    self.order_fields(
+        (
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "role",
+            "username",
+            "password1",
+            "password2",
+        )
+    )
+
+    self.apply_styles()
+
+
+    def clean_role(self):
+    role = self.cleaned_data.get("role")
+
+    protected_roles = {
+        User.Role.DIRECTOR,
+        User.Role.PRINCIPAL,
+    }
+
+    if (
+        self.actor
+        and self.actor.role != User.Role.DIRECTOR
+        and role in protected_roles
+    ):
+        raise forms.ValidationError(
+            "Only a Director can create a Director or Principal account."
+        )
+
+    return role
+    
 
     def clean_username(self):
         username = self.cleaned_data["username"].strip().lower()
