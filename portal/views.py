@@ -24,6 +24,7 @@ from .decorators import roles_required
 from .forms import (
     StaffPasswordResetForm,
     AcademicSessionForm,
+    StaffUsernameChangeForm,
     CommunicationForm,
     CustomPasswordChangeForm,
     ExamForm,
@@ -262,6 +263,43 @@ def change_password(request):
         messages.success(request, "Password changed successfully.")
         return redirect("dashboard")
     return render(request, "portal/form_page.html", {"form": form, "title": "Change password", "submit_label": "Update password"})
+
+
+@roles_required(User.Role.DIRECTOR)
+def change_my_username(request):
+    form = StaffUsernameChangeForm(
+        request.POST or None,
+        instance=request.user,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        old_username = request.user.username
+        user = form.save()
+
+        audit(
+            request,
+            "USERNAME_CHANGED",
+            user,
+            f"User ID changed from {old_username} to {user.username}",
+        )
+
+        messages.success(
+            request,
+            "Your User ID was changed successfully. "
+            "Use the new User ID on your next login.",
+        )
+
+        return redirect("dashboard")
+
+    return render(
+        request,
+        "portal/form_page.html",
+        {
+            "form": form,
+            "title": "Change My User ID",
+            "submit_label": "Update User ID",
+        },
+    )
 
 
 @login_required
@@ -861,6 +899,61 @@ def staff_toggle(request, pk):
         audit(request, "STAFF_STATUS_CHANGED", staff, f"Active={staff.is_active}")
         messages.success(request, "Staff account status updated.")
     return redirect("staff_list")
+
+
+@roles_required(User.Role.DIRECTOR)
+def staff_change_username(request, pk):
+    staff = get_object_or_404(
+        User,
+        pk=pk,
+        role__in=[
+            User.Role.DIRECTOR,
+            User.Role.PRINCIPAL,
+            User.Role.TEACHER,
+            User.Role.ACCOUNTANT,
+            User.Role.TRANSPORT,
+        ],
+    )
+
+    form = StaffUsernameChangeForm(
+        request.POST or None,
+        instance=staff,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        old_username = staff.username
+        updated_staff = form.save()
+
+        audit(
+            request,
+            "STAFF_USERNAME_CHANGED",
+            updated_staff,
+            (
+                f"User ID changed from {old_username} "
+                f"to {updated_staff.username}"
+            ),
+        )
+
+        messages.success(
+            request,
+            f"User ID changed successfully to "
+            f"{updated_staff.username}.",
+        )
+
+        return redirect("staff_list")
+
+    return render(
+        request,
+        "portal/form_page.html",
+        {
+            "form": form,
+            "title": (
+                "Change User ID — "
+                f"{staff.get_full_name() or staff.username}"
+            ),
+            "submit_label": "Update User ID",
+        },
+    )
 
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
