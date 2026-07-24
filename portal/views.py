@@ -804,7 +804,10 @@ def staff_list(request):
 
 @roles_required(User.Role.DIRECTOR, User.Role.PRINCIPAL)
 def staff_create(request):
-    form = StaffForm(request.POST or None)
+    form = StaffForm(
+    request.POST or None,
+    actor=request.user,
+)
     credentials = None
 
     if request.method == "POST" and form.is_valid():
@@ -876,15 +879,19 @@ def staff_reset_password(request, pk):
     )
 
     # A Principal must not take control of a Director account.
-    if (
-        request.user.role == User.Role.PRINCIPAL
-        and staff.role == User.Role.DIRECTOR
-    ):
-        messages.error(
-            request,
-            "A Principal cannot reset a Director account password.",
-        )
-        return redirect("staff_list")
+   if (
+    request.user.role == User.Role.PRINCIPAL
+    and staff.role in {
+        User.Role.DIRECTOR,
+        User.Role.PRINCIPAL,
+    }
+   ):
+       
+    messages.error(
+    request,
+    "A Principal cannot reset a Director or Principal account password.",
+   )
+    return redirect("staff_list")
 
     form = StaffPasswordResetForm(
         staff,
